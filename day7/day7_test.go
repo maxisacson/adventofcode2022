@@ -6,18 +6,25 @@ import (
 )
 
 func TestDay7(t *testing.T) {
-	expected := 95437
-	actual := Run("example.txt")
-	if actual != expected {
-		t.Errorf("Expected: %d\nbut got: %d\n", expected, actual)
+	fmt.Println("===== Day 7 =====")
+
+	{
+		expected := Result{95437, 24933642}
+		actual := Run("example.txt")
+		if actual != expected {
+			t.Errorf("Expected: %d but got: %d\n", expected, actual)
+		}
 	}
 
-	answer := 919137
-	sum := Run("input.txt")
-	if sum != answer {
-		t.Errorf("Expected: %d\nbut got: %d\n", answer, sum)
+	{
+		expected := Result{919137, 2877389}
+		actual := Run("input.txt")
+		if actual != expected {
+			t.Errorf("Expected: %d but got: %d\n", expected, actual)
+		}
+		fmt.Println("--- Part 1 ---")
+		fmt.Println("Sum:", actual.part1)
+		fmt.Println("--- Part 2 ---")
+		fmt.Println("Size:", actual.part2)
 	}
-	fmt.Println("--- Part 1 ---")
-	fmt.Println("Sum:", sum)
-
 }

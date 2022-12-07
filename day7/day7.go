@@ -3,11 +3,22 @@ package day7
 import (
 	"aoc22/utils"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 )
 
-func Run(fileName string) int {
+type Result struct {
+	part1 int
+	part2 int
+}
+
+type Dir struct {
+	name string
+	size int
+}
+
+func Run(fileName string) Result {
 	lines := utils.ReadFileToLines(fileName)
 
 	stack := make([]string, 0)
@@ -23,6 +34,9 @@ func Run(fileName string) int {
 					parent := ""
 					if top >= 0 {
 						parent = stack[top]
+						if parent != "/" {
+							parent += "/"
+						}
 					}
 					cwd = string(line[5:])
 					if cwd == ".." {
@@ -30,9 +44,10 @@ func Run(fileName string) int {
 						stack = stack[:top]
 					} else {
 						if cwd == "/" {
+							parent = ""
 							stack = make([]string, 0)
 						}
-						stack = append(stack, parent+"/"+cwd)
+						stack = append(stack, parent+cwd)
 					}
 				}
 				break
@@ -59,12 +74,30 @@ func Run(fileName string) int {
 	}
 
 	sum := 0
-	for _, val := range sizes {
+	dirs := make([]Dir, 0)
+	for key, val := range sizes {
+		dirs = append(dirs, Dir{name: key, size: val})
 		if val > 100000 {
 			continue
 		}
 		sum += val
 	}
 
-	return sum
+	sort.Slice(dirs, func(i, j int) bool {
+		return dirs[i].size < dirs[j].size
+	})
+
+	totalSize := 70000000
+	freeSpace := totalSize - sizes["/"]
+	minSpace := 30000000
+	size := 0
+	for _, d := range dirs {
+		if freeSpace+d.size < minSpace {
+			continue
+		}
+		size = d.size
+		break
+	}
+
+	return Result{sum, size}
 }
