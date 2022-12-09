@@ -33,6 +33,57 @@ func Run(fileName string) Result {
 		isVisibleBottom[i] = make([]int, nCols)
 	}
 
+	// Part 2
+	bestScore := 0
+	for i, row := range heights {
+		for j, h := range row {
+			// look up
+			score := 0
+			distance := 0
+			for k := i - 1; k >= 0; k-- {
+				distance++
+				if heights[k][j] >= h {
+					break
+				}
+			}
+			score = distance
+			// look down
+			distance = 0
+			for k := i + 1; k < nRows; k++ {
+				distance++
+				if heights[k][j] >= h {
+					break
+				}
+			}
+			score *= distance
+
+			// look left
+			distance = 0
+			for k := j - 1; k >= 0; k-- {
+				distance++
+				if heights[i][k] >= h {
+					break
+				}
+			}
+			score *= distance
+
+			// look right
+			distance = 0
+			for k := j + 1; k < nCols; k++ {
+				distance++
+				if heights[i][k] >= h {
+					break
+				}
+			}
+			score *= distance
+
+			if score > bestScore {
+				bestScore = score
+			}
+		}
+	}
+
+	// Part 1
 	for i := 1; i < nRows-1; i++ {
 		for j := 1; j < nCols-1; j++ {
 
@@ -70,5 +121,5 @@ func Run(fileName string) Result {
 		}
 	}
 
-	return Result{nVisible, 0}
+	return Result{nVisible, bestScore}
 }
