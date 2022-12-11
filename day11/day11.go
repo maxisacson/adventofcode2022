@@ -19,11 +19,16 @@ type Monkey struct {
 	test  int
 	next  []int
 	count int
+	norm  int
+	gcd   int
 }
 
 func (m *Monkey) DoRound(monkies *[]Monkey) {
 	for _, item := range m.items {
-		value := m.DoOp(item) / 3
+		value := m.DoOp(item) / m.norm
+		if m.gcd > 0 {
+			value %= m.gcd
+		}
 
 		var next int
 		if value%m.test == 0 {
@@ -70,36 +75,44 @@ func (m *Monkey) DoOp(item int) int {
 	}
 }
 
+func NewMonkey(i int, lines []string, norm int) Monkey {
+	monkey := Monkey{}
+	fields := strings.Split(lines[i+1], ": ")
+	items := strings.Split(fields[1], ", ")
+	for _, item := range items {
+		it, _ := strconv.Atoi(item)
+		monkey.items = append(monkey.items, it)
+	}
+
+	fields = strings.Split(lines[i+2], " = ")
+	monkey.op = strings.Fields(fields[1])
+
+	fields = strings.Fields(lines[i+3])
+	test, _ := strconv.Atoi(fields[len(fields)-1])
+	monkey.test = test
+
+	fields = strings.Fields(lines[i+4])
+	next0, _ := strconv.Atoi(fields[len(fields)-1])
+
+	fields = strings.Fields(lines[i+5])
+	next1, _ := strconv.Atoi(fields[len(fields)-1])
+
+	monkey.next = []int{next0, next1}
+
+	monkey.norm = norm
+	monkey.gcd = 0
+
+	return monkey
+}
+
 func Run(fileName string) Result {
 	lines := utils.ReadFileToLines(fileName)
 
 	monkies := []Monkey{}
 
+	// Part 1
 	for i := 0; i < len(lines); i += 7 {
-		monkey := Monkey{}
-		fields := strings.Split(lines[i+1], ": ")
-		items := strings.Split(fields[1], ", ")
-		for _, item := range items {
-			it, _ := strconv.Atoi(item)
-			monkey.items = append(monkey.items, it)
-		}
-
-		fields = strings.Split(lines[i+2], " = ")
-		monkey.op = strings.Fields(fields[1])
-
-		fields = strings.Fields(lines[i+3])
-		test, _ := strconv.Atoi(fields[len(fields)-1])
-		monkey.test = test
-
-		fields = strings.Fields(lines[i+4])
-		next0, _ := strconv.Atoi(fields[len(fields)-1])
-
-		fields = strings.Fields(lines[i+5])
-		next1, _ := strconv.Atoi(fields[len(fields)-1])
-
-		monkey.next = []int{next0, next1}
-
-		monkies = append(monkies, monkey)
+		monkies = append(monkies, NewMonkey(i, lines, 3))
 	}
 
 	for i := 0; i < 20; i++ {
@@ -114,5 +127,28 @@ func Run(fileName string) Result {
 
 	monkeyBusiness := monkies[0].count * monkies[1].count
 
-	return Result{monkeyBusiness, 0}
+	// Part 2
+	monkies = []Monkey{}
+	gcd := 1
+	for i := 0; i < len(lines); i += 7 {
+		monkies = append(monkies, NewMonkey(i, lines, 1))
+		gcd *= monkies[len(monkies)-1].test
+	}
+	for j := 0; j < len(monkies); j++ {
+		monkies[j].gcd = gcd
+	}
+
+	for i := 0; i < 10000; i++ {
+		for j := 0; j < len(monkies); j++ {
+			monkies[j].DoRound(&monkies)
+		}
+	}
+
+	sort.Slice(monkies, func(i, j int) bool {
+		return monkies[i].count > monkies[j].count
+	})
+
+	monkeyBusiness2 := monkies[0].count * monkies[1].count
+
+	return Result{monkeyBusiness, monkeyBusiness2}
 }
