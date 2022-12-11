@@ -1,4 +1,4 @@
-package main
+package day3
 
 import (
 	"bufio"
@@ -22,8 +22,13 @@ func log2(x uint64) int {
 	return n
 }
 
-func main() {
-	file, err := os.Open(os.Args[1])
+type Result struct {
+	part1 int
+	part2 int
+}
+
+func Run(fileName string) Result {
+	file, err := os.Open(fileName)
 	if err != nil {
 		panic(err)
 	}
@@ -61,6 +66,7 @@ func main() {
 
 	fmt.Println("--- Part 1 ---")
 	fmt.Println("Sum:", sum)
+	result := Result{sum, 0}
 
 	sum = 0
 	for i := 0; i < len(lines); i += 3 {
@@ -84,4 +90,6 @@ func main() {
 
 	fmt.Println("--- Part 2 ---")
 	fmt.Println("Sum:", sum)
+	result.part2 = sum
+	return result
 }

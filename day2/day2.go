@@ -1,4 +1,4 @@
-package main
+package day2
 
 import (
 	"bufio"
@@ -7,8 +7,13 @@ import (
 	"strings"
 )
 
-func main() {
-	file, err := os.Open(os.Args[1])
+type Result struct {
+	part1 int
+	part2 int
+}
+
+func Run(fileName string) Result {
+	file, err := os.Open(fileName)
 	if err != nil {
 		panic(err)
 	}
@@ -61,6 +66,7 @@ func main() {
 
 	fmt.Println("--- Part 1 ---")
 	fmt.Println("Total score:", totalScore)
+	result := Result{totalScore, 0}
 
 	moveMap := map[string]int{
 		"A": 0, // rock
@@ -101,4 +107,6 @@ func main() {
 	fmt.Println("--- Part 2 ---")
 	fmt.Println("Total score:", totalScore)
 
+	result.part2 = totalScore
+	return result
 }

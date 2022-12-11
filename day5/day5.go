@@ -1,4 +1,4 @@
-package main
+package day5
 
 import (
 	"bufio"
@@ -76,8 +76,13 @@ func buildStacks(crateMap *[]string) [][]string {
 	return stacks
 }
 
-func main() {
-	file, err := os.Open(os.Args[1])
+type Result struct {
+	part1 string
+	part2 string
+}
+
+func Run(fileName string) Result {
+	file, err := os.Open(fileName)
 	if err != nil {
 		panic(err)
 	}
@@ -129,6 +134,7 @@ func main() {
 
 	fmt.Println("--- Part 1 ---")
 	fmt.Println("Message:", message)
+	result := Result{message, ""}
 
 	stacks = buildStacks(&crateMap)
 
@@ -153,4 +159,7 @@ func main() {
 
 	fmt.Println("--- Part 2 ---")
 	fmt.Println("Message:", message)
+	result.part2 = message
+
+	return result
 }

@@ -1,4 +1,4 @@
-package main
+package day1
 
 import (
 	"bufio"
@@ -8,8 +8,13 @@ import (
 	"strconv"
 )
 
-func main() {
-	file, err := os.Open(os.Args[1])
+type Result struct {
+	part1 int
+	part2 int
+}
+
+func Run(fileName string) Result {
+	file, err := os.Open(fileName)
 	if err != nil {
 		panic(err)
 	}
@@ -63,4 +68,6 @@ func main() {
 	fmt.Println("Top 3 sum:", topThreeSum)
 
 	file.Close()
+
+	return Result{maxSum, topThreeSum}
 }

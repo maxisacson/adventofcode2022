@@ -1,4 +1,4 @@
-package main
+package day6
 
 import (
 	"bufio"
@@ -6,8 +6,13 @@ import (
 	"os"
 )
 
-func main() {
-	file, err := os.Open(os.Args[1])
+type Result struct {
+	part1 int
+	part2 int
+}
+
+func Run(fileName string) Result {
+	file, err := os.Open(fileName)
 	if err != nil {
 		panic(err)
 	}
@@ -68,4 +73,5 @@ func main() {
 		panic("wrong answer!")
 	}
 
+	return Result{startOfPacket, startOfMessage}
 }
