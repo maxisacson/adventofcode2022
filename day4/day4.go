@@ -1,4 +1,4 @@
-package main
+package day4
 
 import (
 	"bufio"
@@ -30,8 +30,13 @@ func strings2ints(list []string) []int {
 	return ret
 }
 
-func main() {
-	file, err := os.Open(os.Args[1])
+type Result struct {
+	part1 int
+	part2 int
+}
+
+func Run(fileName string) Result {
+	file, err := os.Open(fileName)
 	if err != nil {
 		panic(err)
 	}
@@ -73,4 +78,6 @@ func main() {
 
 	fmt.Println("--- Part 2 ---")
 	fmt.Println("Count:", countOverlaps)
+
+	return Result{countContains, countOverlaps}
 }
