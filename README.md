@@ -1,3 +1,4 @@
+[![CI](https://github.com/maxisacson/adventofcode2022/actions/workflows/ci.yaml/badge.svg)](https://github.com/maxisacson/adventofcode2022/actions/workflows/ci.yaml)
 # adventofcode2022
 
 https://adventofcode.com/2022
