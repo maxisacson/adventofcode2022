@@ -32,7 +32,7 @@ func IsValid(heightMap *[][]int, pos Vec) bool {
 	return true
 }
 
-func FindPath(heightMap *[][]int, start, goal Vec) int {
+func FindDistances(heightMap *[][]int, start Vec) [][]int {
 	adjacent := []Vec{
 		{0, -1},
 		{0, 1},
@@ -73,10 +73,6 @@ func FindPath(heightMap *[][]int, start, goal Vec) int {
 		unvisited = unvisited[:next]
 		height := (*heightMap)[pos.y][pos.x]
 
-		if pos == goal {
-			break
-		}
-
 		for _, v := range adjacent {
 			newPos := pos.Add(v)
 
@@ -89,7 +85,7 @@ func FindPath(heightMap *[][]int, start, goal Vec) int {
 			}
 
 			newHeight := (*heightMap)[newPos.y][newPos.x]
-			if newHeight > height+1 {
+			if height >= newHeight+2 {
 				continue
 			}
 
@@ -100,7 +96,7 @@ func FindPath(heightMap *[][]int, start, goal Vec) int {
 		}
 	}
 
-	return distance[goal.y][goal.x]
+	return distance
 }
 
 func Run(fileName string) Result {
@@ -127,7 +123,21 @@ func Run(fileName string) Result {
 		}
 	}
 
-	steps := FindPath(&heightMap, start, goal)
+	dists := FindDistances(&heightMap, goal)
 
-	return Result{steps, 0}
+	shortest := 999999999
+	for y, row := range heightMap {
+		for x, h := range row {
+			if h > 0 {
+				continue
+			}
+			dist := dists[y][x]
+			if dist < shortest {
+				shortest = dist
+			}
+		}
+	}
+	steps := dists[start.y][start.x]
+
+	return Result{steps, shortest}
 }

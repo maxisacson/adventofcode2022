@@ -9,7 +9,7 @@ func TestDay12(t *testing.T) {
 	fmt.Println("===== Day 12 =====")
 
 	{
-		expected := Result{31, 0}
+		expected := Result{31, 29}
 		actual := Run("example.txt")
 		if actual != expected {
 			t.Errorf("Expected: %d but got: %d\n", expected, actual)
@@ -17,7 +17,7 @@ func TestDay12(t *testing.T) {
 	}
 
 	{
-		expected := Result{437, 0}
+		expected := Result{437, 430}
 		actual := Run("input.txt")
 		if actual != expected {
 			t.Errorf("Expected: %d but got: %d\n", expected, actual)
