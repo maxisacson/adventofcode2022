@@ -32,7 +32,14 @@ func ParsePath(line string) []Vec {
 	return path
 }
 
-func DrawLine(board *[][]byte, xMin int, start Vec, stop Vec) {
+type Board struct {
+	Map      map[Vec]byte
+	Min      Vec
+	Max      Vec
+	IsFinite bool
+}
+
+func (b *Board) DrawLine(start Vec, stop Vec) {
 	if start.x == stop.x {
 		y := start.y
 		y1 := stop.y
@@ -41,7 +48,7 @@ func DrawLine(board *[][]byte, xMin int, start Vec, stop Vec) {
 		}
 		x := start.x
 		for y <= y1 {
-			(*board)[y][x-xMin] = '#'
+			b.DrawTileChecked(Vec{x, y}, '#')
 			y++
 		}
 	} else if start.y == stop.y {
@@ -52,7 +59,7 @@ func DrawLine(board *[][]byte, xMin int, start Vec, stop Vec) {
 		}
 		y := start.y
 		for x <= x1 {
-			(*board)[y][x-xMin] = '#'
+			b.DrawTileChecked(Vec{x, y}, '#')
 			x++
 		}
 	} else {
@@ -60,86 +67,91 @@ func DrawLine(board *[][]byte, xMin int, start Vec, stop Vec) {
 	}
 }
 
-func MakeBoard(paths [][]Vec, source Vec) ([][]byte, int) {
-
-	yMax := 0
-	xMin := 99999
-	xMax := -99999
-	for _, path := range paths {
-		for _, point := range path {
-			if point.y > yMax {
-				yMax = point.y
-			}
-			if point.x > xMax {
-				xMax = point.x
-			}
-			if point.x < xMin {
-				xMin = point.x
-			}
-		}
+func (b *Board) DrawTileChecked(pos Vec, tile byte) {
+	if pos.y > b.Max.y {
+		b.Max.y = pos.y
+	}
+	if pos.y < b.Min.y {
+		b.Min.y = pos.y
+	}
+	if pos.x > b.Max.x {
+		b.Max.x = pos.x
+	}
+	if pos.x < b.Min.x {
+		b.Min.x = pos.x
 	}
 
-	nRows := yMax + 1
-	nCols := xMax - xMin + 1
-	board := make([][]byte, nRows)
-	for row := range board {
-		board[row] = make([]byte, nCols)
-		for col := range board[row] {
-			board[row][col] = '.'
-		}
-	}
+	b.Map[pos] = tile
+}
+
+func MakeBoard(paths [][]Vec, source Vec) Board {
+
+	board := Board{}
+	board.Map = make(map[Vec]byte)
+	board.Min = Vec{9999, 9999}
+	board.Max = Vec{-9999, -9999}
+	board.IsFinite = true
 
 	for _, path := range paths {
 		for i, point := range path[:len(path)-1] {
-			DrawLine(&board, xMin, point, path[i+1])
+			board.DrawLine(point, path[i+1])
 		}
 	}
-	board[source.y][source.x-xMin] = '+'
+	board.DrawTileChecked(source, '+')
 
-	return board, xMin
+	return board
 }
 
-func SimulateGrain(board *[][]byte, source Vec) bool {
-	yMax := len(*board) - 1
-	xMax := len((*board)[0]) - 1
+func (b *Board) IsAir(pos Vec) bool {
+	_, ok := b.Map[pos]
+	isAir := !ok
+	isFloor := !b.IsFinite && pos.y == b.Max.y
+	return isAir && !isFloor
+}
 
+func (b *Board) IsOutside(pos Vec) bool {
+	inBoundsY := pos.y <= b.Max.y && pos.y >= b.Min.y
+	inBoundsX := (pos.x <= b.Max.x && pos.x >= b.Min.x) || !b.IsFinite
+	return !inBoundsX || !inBoundsY
+}
+
+func (b *Board) SimulateGrain(source Vec) bool {
 	pos := source
-	x, y := pos.x, pos.y
+	next := pos
 	for true {
-		x = pos.x
-		y = pos.y + 1
+		next.y = pos.y + 1
 
-		if y > yMax {
+		if b.IsOutside(next) {
 			// sand is in the abyss
 			return false
 		}
 
-		if (*board)[y][x] == '.' {
-			pos = Vec{x, y}
+		if b.IsAir(next) {
+			pos = next
 			continue
 		}
 
-		x = pos.x - 1
-		y = pos.y + 1
-		if x < 0 || x > xMax {
-			// sand is in the abyss
+		next.x = pos.x - 1
+		next.y = pos.y + 1
+
+		if b.IsOutside(next) {
 			return false
 		}
 
-		if (*board)[y][x] == '.' {
-			pos = Vec{x, y}
+		if b.IsAir(next) {
+			pos = next
 			continue
 		}
 
-		x = pos.x + 1
-		y = pos.y + 1
-		if x < 0 || x > xMax {
-			// sand is in the abyss
+		next.x = pos.x + 1
+		next.y = pos.y + 1
+
+		if b.IsOutside(next) {
 			return false
 		}
 
-		if (*board)[y][x] == '.' {
-			pos = Vec{x, y}
+		if b.IsAir(next) {
+			pos = next
 			continue
 		}
 
@@ -147,15 +159,26 @@ func SimulateGrain(board *[][]byte, source Vec) bool {
 		break
 	}
 
-	(*board)[pos.y][pos.x] = 'o'
+	if b.IsFinite {
+		b.Map[pos] = 'o'
+	} else {
+		b.DrawTileChecked(pos, 'o')
+	}
 
 	return true
 }
 
-func DrawBoard(board *[][]byte) {
-	for _, row := range *board {
-		for _, col := range row {
-			fmt.Print(string(col))
+func (b *Board) Draw() {
+
+	for y := b.Min.y; y <= b.Max.y; y++ {
+		for x := b.Min.x; x <= b.Max.x; x++ {
+			if tile, ok := b.Map[Vec{x, y}]; ok {
+				fmt.Print(string(tile))
+			} else if !b.IsFinite && y == b.Max.y {
+				fmt.Print("#")
+			} else {
+				fmt.Print(".")
+			}
 		}
 		fmt.Println()
 	}
@@ -172,14 +195,22 @@ func Run(fileName string) Result {
 	}
 
 	source := Vec{500, 0}
-	board, xMin := MakeBoard(paths, source)
-	DrawBoard(&board)
-	source.x -= xMin
+
+	// Part 1
+	board := MakeBoard(paths, source)
 
 	count := 0
-	for ; SimulateGrain(&board, source); count++ {
+	for ; board.SimulateGrain(source); count++ {
 	}
-	DrawBoard(&board)
 
-	return Result{count, 0}
+	// Part 1
+	board = MakeBoard(paths, source)
+	board.Max.y += 2
+	board.IsFinite = false
+
+	count2 := 0
+	for ; board.Map[source] != 'o'; board.SimulateGrain(source) {
+		count2++
+	}
+	return Result{count, count2}
 }
