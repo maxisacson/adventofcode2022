@@ -2,7 +2,6 @@ package day15
 
 import (
 	"aoc22/utils"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -61,24 +60,6 @@ func ParseSensor(line string) Sensor {
 	return Sensor{pos, beacon, Dist(pos, beacon)}
 }
 
-func Print() {
-	fmt.Println()
-}
-
-func FindClosest(sensors *[]Sensor, pos Vec) (Sensor, int) {
-	minIndex := 0
-	minDist := 9999
-	for i, sensor := range *sensors {
-		dist := Dist(sensor.pos, pos)
-		if dist < minDist {
-			minDist = dist
-			minIndex = i
-		}
-	}
-
-	return (*sensors)[minIndex], minDist
-}
-
 func IsCovered(sensors *[]Sensor, pos Vec) (bool, Sensor, int) {
 	minIndex := 0
 	minDist := 9999
@@ -112,7 +93,35 @@ func CanContainBeacon(sensors *[]Sensor, pos Vec) bool {
 	return result
 }
 
-func Run(fileName string, targetRow int) Result {
+func FindFreq(sensors *[]Sensor, searchMin Vec, searchMax Vec) int {
+	for _, sensor := range *sensors {
+		dist := sensor.dist + 1
+		pos := sensor.pos
+		for y := pos.y - dist; y <= pos.y+dist; y++ {
+			x := dist + pos.x - Abs(y-pos.y)
+			checkPos := Vec{x, y}
+			if searchMin.y <= y && y < searchMax.y && searchMin.x <= x && x < searchMax.x {
+				result, _, _ := IsCovered(sensors, checkPos)
+				if !result {
+					return 4000000*x + y
+				}
+			}
+
+			x = pos.x + Abs(y-pos.y) - dist
+			checkPos = Vec{x, y}
+			if searchMin.y <= y && y < searchMax.y && searchMin.x <= x && x < searchMax.x {
+				result, _, _ := IsCovered(sensors, checkPos)
+				if !result {
+					return 4000000*x + y
+				}
+			}
+		}
+	}
+
+	return 0
+}
+
+func Run(fileName string, targetRow int, searchSize int) Result {
 	lines := utils.ReadFileToLines(fileName)
 
 	xMin := 9999
@@ -128,53 +137,7 @@ func Run(fileName string, targetRow int) Result {
 		xMax = Max(xMax, Max(sensor.pos.x+sensor.dist, sensor.beacon.x+sensor.dist))
 		yMin = Min(yMin, Min(sensor.pos.y-sensor.dist, sensor.beacon.y-sensor.dist))
 		yMax = Max(yMax, Max(sensor.pos.y+sensor.dist, sensor.beacon.y+sensor.dist))
-		// fmt.Println(sensor)
 	}
-
-	// nRows := yMax - yMin + 1
-	// nCols := xMax - xMin + 1
-
-	// coverage := make([][]bool, nRows)
-	// for i := range coverage {
-	// 	coverage[i] = make([]bool, nCols)
-	// }
-	//
-	// for _, sensor := range sensors {
-	// 	x0 := sensor.pos.x - sensor.dist
-	// 	y0 := sensor.pos.y - sensor.dist
-	// 	x1 := sensor.pos.x + sensor.dist
-	// 	y1 := sensor.pos.y + sensor.dist
-	// 	for y := y0; y <= y1; y++ {
-	// 		for x := x0; x <= x1; x++ {
-	// 			i := y - yMin
-	// 			j := x - xMin
-	// 			pos := Vec{x, y}
-	// 			dist := Dist(sensor.pos, pos)
-	// 			if dist <= sensor.dist && pos != sensor.beacon {
-	// 				coverage[i][j] = true
-	// 			}
-	// 		}
-	// 	}
-	// }
-
-	// sensors2 := []Sensor{sensors[6]}
-	//
-	// for y := yMin; y <= yMax; y++ {
-	// 	for x := xMin; x <= xMax; x++ {
-	// 		pos := Vec{x, y}
-	// 		result, sensor, _ := IsCovered(&sensors2, pos)
-	// 		if !result {
-	// 			fmt.Print(".")
-	// 		} else if pos == sensor.pos {
-	// 			fmt.Print("S")
-	// 		} else if pos == sensor.beacon {
-	// 			fmt.Print("B")
-	// 		} else {
-	// 			fmt.Print("#")
-	// 		}
-	// 	}
-	// 	fmt.Println()
-	// }
 
 	count := 0
 	y := targetRow
@@ -186,5 +149,9 @@ func Run(fileName string, targetRow int) Result {
 		}
 	}
 
-	return Result{count, 0}
+	searchMin := Vec{0, 0}
+	searchMax := Vec{searchSize, searchSize}
+	freq := FindFreq(&sensors, searchMin, searchMax)
+
+	return Result{count, freq}
 }
