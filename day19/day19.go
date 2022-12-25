@@ -24,64 +24,88 @@ type Blueprint struct {
 	GeodeRobotCost    Pair
 }
 
-func RunBlueprint(bp Blueprint) int {
-	ore := 0
-	clay := 0
-	obsidian := 0
-	geodes := 0
+type State struct {
+	ore      int
+	clay     int
+	obsidian int
+	geodes   int
 
-	nOreRobots := 1
-	nClayRobots := 0
-	nObsidianRobots := 0
-	nGeodeRobots := 0
+	nOreRobots      int
+	nClayRobots     int
+	nObsidianRobots int
+	nGeodeRobots    int
 
-	nOreRobotsQueued := 0
-	nClayRobotsQueued := 0
-	nObsidianRobotsQueued := 0
-	nGeodeRobotsQueued := 0
+	nOreRobotsQueued      int
+	nClayRobotsQueued     int
+	nObsidianRobotsQueued int
+	nGeodeRobotsQueued    int
+}
 
-	for i := 1; i <= 24; i++ {
-		if ore >= bp.GeodeRobotCost.first && obsidian >= bp.GeodeRobotCost.second {
-			ore -= bp.GeodeRobotCost.first
-			obsidian -= bp.GeodeRobotCost.second
-			nGeodeRobotsQueued++
-		}
-
-		if ore >= bp.ObsidianRobotCost.first && clay >= bp.ObsidianRobotCost.second {
-			ore -= bp.ObsidianRobotCost.first
-			clay -= bp.ObsidianRobotCost.second
-			nObsidianRobotsQueued++
-		}
-
-		if ore >= bp.ClayRobotCost {
-			ore -= bp.ClayRobotCost
-			nClayRobotsQueued++
-		}
-
-		if ore >= bp.OreRobotCost {
-			ore -= bp.OreRobotCost
-			nOreRobotsQueued++
-		}
-
-		ore += nOreRobots
-		clay += nClayRobots
-		obsidian += nObsidianRobots
-		geodes += nGeodeRobots
-
-		nGeodeRobots += nGeodeRobotsQueued
-		nObsidianRobots += nObsidianRobotsQueued
-		nClayRobots += nClayRobotsQueued
-		nOreRobots += nOreRobotsQueued
-
-		nGeodeRobotsQueued = 0
-		nObsidianRobotsQueued = 0
-		nClayRobotsQueued = 0
-		nOreRobotsQueued = 0
-
-		fmt.Printf("ore:%d clay:%d obs:%d geo:%d  ore rob:%d clay rob:%d obs rob:%d geo rob:%d\n", ore, clay, obsidian, geodes, nOreRobots, nClayRobots, nObsidianRobots, nGeodeRobots)
+func RunBlueprint(timeLeft int, bp Blueprint, state State, geodesTotal int) int {
+	if timeLeft == 0 {
+		return 0
 	}
 
-	return geodes
+	// queue robots
+	// collect resources
+	// build robot
+
+	states := []State{}
+
+	maxGeodes := 0
+	if state.ore >= bp.OreRobotCost {
+		nextState := state
+		nextState.ore -= bp.OreRobotCost
+		nextState.nOreRobotsQueued++
+		states = append(states, nextState)
+	}
+
+	if state.clay >= bp.ClayRobotCost {
+		nextState := state
+		nextState.clay -= bp.ClayRobotCost
+		nextState.nClayRobotsQueued++
+		states = append(states, nextState)
+	}
+
+	if state.ore >= bp.ObsidianRobotCost.first && state.clay >= bp.ObsidianRobotCost.second {
+		nextState := state
+		nextState.ore -= bp.ObsidianRobotCost.first
+		nextState.clay -= bp.ObsidianRobotCost.second
+		nextState.nObsidianRobotsQueued++
+		states = append(states, nextState)
+	}
+
+	if state.ore >= bp.GeodeRobotCost.first && state.obsidian >= bp.GeodeRobotCost.second {
+		nextState := state
+		nextState.ore -= bp.GeodeRobotCost.first
+		nextState.obsidian -= bp.GeodeRobotCost.second
+		nextState.nGeodeRobotsQueued++
+		states = append(states, nextState)
+	}
+
+	for _, nextState := range states {
+		nextState.ore += nextState.nOreRobots
+		nextState.clay += nextState.nClayRobots
+		nextState.obsidian += nextState.nObsidianRobots
+		nextState.geodes += nextState.nGeodeRobots
+
+		nextState.nOreRobots += nextState.nOreRobotsQueued
+		nextState.nClayRobots += nextState.nClayRobotsQueued
+		nextState.nObsidianRobots += nextState.nObsidianRobotsQueued
+		nextState.nGeodeRobots += nextState.nGeodeRobotsQueued
+
+		nextState.nOreRobotsQueued = 0
+		nextState.nClayRobotsQueued = 0
+		nextState.nObsidianRobotsQueued = 0
+		nextState.nGeodeRobotsQueued = 0
+
+		geodes := RunBlueprint(timeLeft-1, bp, nextState, nextState.geodes)
+		if geodes > maxGeodes {
+			maxGeodes = geodes
+		}
+	}
+
+	return maxGeodes + geodesTotal
 }
 
 func Run(fileName string) Result {
@@ -107,8 +131,12 @@ func Run(fileName string) Result {
 		blueprints = append(blueprints, blueprint)
 	}
 
+	state := State{}
+
+	state.nOreRobots = 1
+
 	for _, bp := range blueprints {
-		count := RunBlueprint(bp)
+		count := RunBlueprint(24, bp, state, 0)
 		fmt.Println(count)
 	}
 
