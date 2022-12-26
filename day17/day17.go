@@ -149,6 +149,9 @@ type Board struct {
 	width int
 	jets  string
 	j     int
+
+	index    int
+	capacity int
 }
 
 func (b *Board) DropRock(shape rune) {
@@ -168,6 +171,10 @@ func (b *Board) DropRock(shape rune) {
 	if testTop > b.top {
 		b.top = testTop
 	}
+	b.AppendRock(rock)
+}
+
+func (b *Board) AppendRock(rock Rock) {
 	b.rocks = append(b.rocks, rock)
 }
 
@@ -244,6 +251,7 @@ func (b Board) String() string {
 			} else if x == nCols-1 {
 				row[x] = fmt.Sprintf("| %d", y-1)
 			} else {
+				// row[x] = "."
 				row[x] = " "
 			}
 		}
@@ -253,6 +261,7 @@ func (b Board) String() string {
 	for _, rock := range b.rocks {
 		for _, block := range rock.blocks {
 			sprite[block.y+rock.pos.y+1][block.x+rock.pos.x+1] = rock.shape
+			// sprite[block.y+rock.pos.y+1][block.x+rock.pos.x+1] = "#"
 		}
 	}
 
@@ -264,6 +273,14 @@ func (b Board) String() string {
 	return s
 }
 
+func NewBoard(width int, jets string) Board {
+	board := Board{}
+	board.width = width
+	board.jets = jets
+
+	return board
+}
+
 func Run(fileName string) Result {
 	lines := utils.ReadFileToLines(fileName)
 
@@ -271,13 +288,60 @@ func Run(fileName string) Result {
 
 	rockOrder := "-+JIo"
 
-	board := Board{}
-	board.width = 7
-	board.jets = jets
+	// Part 1
+	board := NewBoard(7, jets)
 	for i := 0; i < 2022; i++ {
 		shape := rockOrder[i%len(rockOrder)]
 		board.DropRock(rune(shape))
 	}
 
-	return Result{board.top, 0}
+	// Part 2
+	board2 := NewBoard(7, jets)
+
+	patLen := 10
+	matchFound := false
+	patStart := 0
+	patRepeat := 0
+	for pos := 0; pos < len(board.rocks)-patLen-1; pos++ {
+		pattern := board.rocks[pos : pos+patLen]
+
+		for findPos := pos + 1; findPos < len(board.rocks)-patLen; findPos++ {
+			match := true
+			for i := 0; i < patLen; i++ {
+				rock := board.rocks[findPos+i]
+				if rock.pos.x == pattern[i].pos.x && rock.shape == pattern[i].shape {
+					match = match && true
+				} else {
+					match = match && false
+				}
+			}
+			if match {
+				matchFound = true
+				patStart = pos
+				patRepeat = findPos - pos
+				break
+			}
+		}
+
+		if matchFound {
+			break
+		}
+	}
+
+	patHeight := board.rocks[patStart+patRepeat+patLen-1].Max().y - board.rocks[patStart+patLen-1].Max().y
+
+	total := 1000000000000
+	for i := 0; i < patStart; i++ {
+		shape := rockOrder[i%len(rockOrder)]
+		board2.DropRock(rune(shape))
+	}
+	total -= patStart
+	rem := total % patRepeat
+	for i := 0; i < rem; i++ {
+		shape := rockOrder[(i+patStart)%len(rockOrder)]
+		board2.DropRock(rune(shape))
+	}
+	patExtra := patHeight * (total - rem) / patRepeat
+
+	return Result{board.top, board2.top + patExtra}
 }
