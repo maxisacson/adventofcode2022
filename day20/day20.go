@@ -27,45 +27,95 @@ func Pop(list *[]int) int {
 	return x
 }
 
-func Move(list *[]int, oldIndex, newIndex int) {
-	N := len(*list)
-	left := make([]int, oldIndex)
-	right := make([]int, N-oldIndex-1)
-	copy(left, (*list)[:oldIndex])
-	copy(right, (*list)[oldIndex+1:])
-
-	if newIndex < len(left) {
-		left = Insert(left, newIndex, (*list)[oldIndex])
-	} else {
-		rightIndex := newIndex - len(left)
-		right = Insert(right, rightIndex, (*list)[oldIndex])
+func NewIndex(shift, index, length int) int {
+	if shift%(length-1) == 0 {
+		return index
 	}
 
-	*list = append(left, right...)
+	if index+shift >= length-1 {
+		return (index + shift) % (length - 1)
+	} else if index+shift <= 0 {
+		for index+shift <= 0 {
+			shift += length - 1
+		}
+
+		return index + shift
+	}
+
+	return index + shift
 }
 
-func MixOnce(numbers, stack []int) ([]int, []int) {
+func Shift(list *[]int, index, shift int) int {
+	length := len(*list)
+	newIndex := NewIndex(shift, index, length)
 
-	index := Pop(&stack)
-	N := len(numbers)
+	Move(list, index, newIndex)
 
-	newIndex := (index + numbers[index]) % (N - 1)
-	for newIndex < 0 {
-		newIndex += (N - 1)
+	return newIndex
+}
+
+func Move(list *[]int, index, newIndex int) {
+	if newIndex < 0 || newIndex >= len(*list) {
+		panic("newIndex out of bounds")
 	}
-	if newIndex == 0 && numbers[index] < 0 {
-		newIndex = N - 1
+	value := (*list)[index]
+	copy((*list)[index:], (*list)[index+1:])
+	copy((*list)[newIndex+1:], (*list)[newIndex:])
+	(*list)[newIndex] = value
+}
+
+func MixOnce(numbers, stack *[]int, order *[]int) {
+	index := Pop(stack)
+
+	n := (*numbers)[index]
+	newIndex := Shift(numbers, index, n)
+
+	UpdateStack(stack, index, newIndex)
+
+	if order != nil {
+		for i, x := range *order {
+			if index <= x && x <= newIndex {
+				(*order)[i]--
+			} else if newIndex <= x && x <= index {
+				(*order)[i]++
+			}
+		}
+		j := len(*order) - len(*stack) - 1
+		(*order)[j] = newIndex
 	}
+}
 
-	Move(&numbers, index, newIndex)
+func UpdateStack(stack *[]int, index, newIndex int) {
+	for i, x := range *stack {
+		if index < x && x <= newIndex {
+			(*stack)[i]--
+		} else if newIndex <= x && x < index {
+			(*stack)[i]++
+		}
+	}
+}
 
-	for i := 0; i < len(stack); i++ {
-		if index < stack[i] && stack[i] <= newIndex {
-			stack[i]--
+func IndexOf(value int, list *[]int) int {
+	for i, n := range *list {
+		if n == value {
+			return i
 		}
 	}
 
-	return numbers, stack
+	return len(*list)
+}
+
+func Reversed(list *[]int) []int {
+	N := len(*list)
+	reversed := make([]int, N)
+	for i, x := range *list {
+		reversed[N-1-i] = x
+	}
+	return reversed
+}
+
+func MakeStack(order *[]int) []int {
+	return Reversed(order)
 }
 
 func Run(fileName string) Result {
@@ -75,98 +125,46 @@ func Run(fileName string) Result {
 	order := make([]int, len(lines))
 	for i, line := range lines {
 		numbers[i], _ = strconv.Atoi(line)
-		order[i] = len(lines) - 1 - i
+		order[i] = i
 	}
 
 	// part 1
-	numbers1 := make([]int, len(numbers))
-	order1 := make([]int, len(order))
-	copy(numbers1, numbers)
-	copy(order1, order)
-	for len(order1) > 0 {
-		numbers1, order1 = MixOnce(numbers1, order1)
+	stack := MakeStack(&order)
+	fmt.Println(numbers, order, stack)
+	for len(stack) > 0 {
+		MixOnce(&numbers, &stack, &order)
+		fmt.Println(numbers, order, stack)
 	}
-	for _, n := range numbers {
-		fmt.Print(n, ", ")
-	}
-	fmt.Println()
-	for _, val := range order1 {
-		fmt.Print(numbers1[val], ", ")
-	}
-	fmt.Println()
 
-	index := 0
-	for i, val := range numbers1 {
-		if val == 0 {
-			index = i
-			break
+	ind := IndexOf(0, &numbers)
+	// fmt.Println(i)
+	N := len(numbers)
+	sum := numbers[(ind+1000)%N]
+	sum += numbers[(ind+2000)%N]
+	sum += numbers[(ind+3000)%N]
+
+	fmt.Println(numbers[(ind+1000)%N])
+	fmt.Println(numbers[(ind+2000)%N])
+	fmt.Println(numbers[(ind+3000)%N])
+
+	// order = make([]int, len(lines))
+	for i, line := range lines {
+		numbers[i], _ = strconv.Atoi(line)
+		// numbers[i] *= 811589153
+		order[i] = i
+	}
+
+	for round := 0; round < 2; round++ {
+		fmt.Println("Round", round+1)
+		stack = MakeStack(&order)
+		fmt.Println(numbers, order, Reversed(&stack))
+		for len(stack) > 0 {
+			MixOnce(&numbers, &stack, &order)
+			fmt.Println(numbers, order, Reversed(&stack))
 		}
+		stack = MakeStack(&order)
+		// fmt.Println(numbers, order)
 	}
 
-	sum := numbers1[(index+1000)%len(numbers1)]
-	sum += numbers1[(index+2000)%len(numbers1)]
-	sum += numbers1[(index+3000)%len(numbers1)]
-
-	// part 2
-	key := 811589153
-	// key := 1
-	numbers2 := make([]int, len(numbers))
-	orderMap := map[int]int{}
-	for i, val := range numbers {
-		newVal := key * val
-		numbers2[i] = newVal
-		orderMap[newVal] = i
-	}
-	fmt.Println(orderMap)
-
-	// fmt.Println(numbers2)
-	fmt.Println()
-	for round := 0; round < 10; round++ {
-		order2 := make([]int, len(numbers2))
-		for i, val := range numbers2 {
-			j := orderMap[val]
-			order2[len(order2)-1-j] = i
-		}
-		fmt.Println(order2)
-		for len(order2) > 0 {
-			numbers2, order2 = MixOnce(numbers2, order2)
-		}
-		// fmt.Println(numbers2)
-		// fmt.Println(order2)
-		// for _, n := range numbers {
-		// 	fmt.Print(n, ", ")
-		// }
-		// fmt.Println()
-		// for _, val := range order2 {
-		// 	// j := len(order2) - i - 1
-		// 	fmt.Print(numbers2[val], ", ")
-		//
-		// 	// if numbers[j] != numbers2[val] {
-		// 	// 	panic("help!")
-		// 	// }
-		// 	// if numbers[len(order2)-i-1] != numbers2[val] {
-		// 	// 	panic("help!")
-		// 	// }
-		// }
-		// fmt.Println()
-		fmt.Println(numbers2)
-		fmt.Println()
-	}
-
-	index = 0
-	for i, val := range numbers2 {
-		if val == 0 {
-			index = i
-			break
-		}
-	}
-	// fmt.Println(numbers2[(index+1000)%len(numbers2)])
-	// fmt.Println(numbers2[(index+2000)%len(numbers2)])
-	// fmt.Println(numbers2[(index+3000)%len(numbers2)])
-
-	sum2 := numbers2[(index+1000)%len(numbers2)]
-	sum2 += numbers2[(index+2000)%len(numbers2)]
-	sum2 += numbers2[(index+3000)%len(numbers2)]
-
-	return Result{sum, sum2}
+	return Result{sum, 0}
 }
