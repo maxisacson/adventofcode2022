@@ -2,6 +2,7 @@ package day22
 
 import (
 	"aoc22/utils"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -29,25 +30,42 @@ func (c *Cursor) Rotate(dir int) {
 }
 
 type Board struct {
-	tiles  []string
-	cursor Cursor
+	tiles   []string
+	cursor  Cursor
+	isCube  bool
+	edgeMap map[Cursor]Cursor
 }
 
 func (b *Board) Move(move string) {
 	switch move {
 	case "L":
-		b.cursor.Rotate(-1)
+		b.RotateCursor(-1)
 	case "R":
-		b.cursor.Rotate(1)
+		b.RotateCursor(1)
 	default:
 		dist, _ := strconv.Atoi(move)
 		b.MoveCursor(dist)
 	}
 }
 
-func (b *Board) MoveCursor(steps int) {
-	dir := b.cursor.dir
+func (b *Board) RotateCursor(dir int) {
+	b.cursor.Rotate(dir)
 
+	bytes := []byte(b.tiles[b.cursor.y])
+	switch b.cursor.dir {
+	case 0:
+		bytes[b.cursor.x] = '>'
+	case 1:
+		bytes[b.cursor.x] = 'v'
+	case 2:
+		bytes[b.cursor.x] = '<'
+	case 3:
+		bytes[b.cursor.x] = '^'
+	}
+	b.tiles[b.cursor.y] = string(bytes)
+}
+
+func Direction(dir int) (int, int) {
 	dx := 0
 	dy := 0
 
@@ -62,22 +80,58 @@ func (b *Board) MoveCursor(steps int) {
 		dy = -1
 	}
 
+	return dx, dy
+}
+
+func (b *Board) MoveCursor(steps int) {
 	for step := 0; step < steps; step++ {
-		x := b.WrapX(b.cursor.x+dx, b.cursor.y)
-		y := b.WrapY(b.cursor.x, b.cursor.y+dy)
-		if !b.IsValid(x, y) {
+		dx, dy := Direction(b.cursor.dir)
+		if dx != 0 && dy != 0 {
+			panic("No diagonal steps!")
+		}
+
+		next := b.cursor
+		if b.isCube {
+			next = b.WrapXYCube(b.cursor.x+dx, b.cursor.y+dy, b.cursor.dir)
+		} else {
+			next.x = b.WrapXFlat(b.cursor.x+dx, b.cursor.y)
+			next.y = b.WrapYFlat(b.cursor.x, b.cursor.y+dy)
+		}
+
+		if !b.IsValid(next.x, next.y) {
 			break
 		}
-		b.cursor.x = x
-		b.cursor.y = y
+		b.cursor = next
+		bytes := []byte(b.tiles[b.cursor.y])
+		switch b.cursor.dir {
+		case 0:
+			bytes[b.cursor.x] = '>'
+		case 1:
+			bytes[b.cursor.x] = 'v'
+		case 2:
+			bytes[b.cursor.x] = '<'
+		case 3:
+			bytes[b.cursor.x] = '^'
+		}
+		b.tiles[b.cursor.y] = string(bytes)
 	}
+
 }
 
 func (b *Board) IsValid(x, y int) bool {
 	return b.tiles[y][x] != '#'
 }
 
-func (b *Board) WrapX(x, y int) int {
+func (b *Board) WrapXYCube(x, y, dir int) Cursor {
+	pos := Cursor{x, y, dir}
+	dst, ok := b.edgeMap[pos]
+	if ok {
+		return dst
+	}
+	return pos
+}
+
+func (b *Board) WrapXFlat(x, y int) int {
 	xMin := 0
 	xMax := len(b.tiles[0]) - 1
 
@@ -113,7 +167,7 @@ func (b *Board) WrapX(x, y int) int {
 	return newX
 }
 
-func (b *Board) WrapY(x, y int) int {
+func (b *Board) WrapYFlat(x, y int) int {
 	yMin := 0
 	yMax := len(b.tiles) - 1
 
@@ -132,7 +186,7 @@ func (b *Board) WrapY(x, y int) int {
 	}
 
 	if (yMin-y) > 1 || (y-yMax) > 1 {
-		panic("Take one step at a time!")
+		panic(fmt.Sprintf("Take one step at a time! y = %d, (%d, %d)", y, yMin, yMax))
 	}
 
 	newY := y
@@ -145,6 +199,137 @@ func (b *Board) WrapY(x, y int) int {
 	}
 
 	return newY
+}
+
+func MakeBoard(tiles []string, cursor Cursor, isCube bool) Board {
+	board := Board{}
+	board.tiles = make([]string, len(tiles))
+	copy(board.tiles, tiles)
+	board.cursor = cursor
+	board.isCube = isCube
+
+	bytes := []byte(board.tiles[cursor.y])
+	switch cursor.dir {
+	case 0:
+		bytes[cursor.x] = '>'
+	case 1:
+		bytes[cursor.x] = 'v'
+	case 2:
+		bytes[cursor.x] = '<'
+	case 3:
+		bytes[cursor.x] = '^'
+	}
+	board.tiles[cursor.y] = string(bytes)
+
+	if isCube {
+		edgeMap := make(map[Cursor]Cursor)
+		nRows := len(tiles)
+		nCols := len(tiles[0])
+		h := nRows / 3
+		w := nCols / 4
+		if h != w {
+			panic(fmt.Sprintf("cube sides not equal: %d %d", w, h))
+		}
+
+		// 1 <-> 2
+		for x := 0; x < w; x++ {
+			// 1 -> 2
+			src := Cursor{x + 2*w, -1, 3}
+			dst := Cursor{w - 1 - x, h, 1}
+			edgeMap[src] = dst
+
+			// 2 -> 1
+			src = Cursor{x, h - 1, 3}
+			dst = Cursor{3*w - 1 - x, 0, 1}
+			edgeMap[src] = dst
+		}
+
+		// 1 <-> 3
+		for y := 0; y < h; y++ {
+			// 1 -> 3
+			src := Cursor{2*w - 1, y, 2}
+			dst := Cursor{y + w, h, 1}
+			edgeMap[src] = dst
+
+			// 3 -> 1
+			src = Cursor{y + w, h - 1, 3}
+			dst = Cursor{2 * w, y, 0}
+			edgeMap[src] = dst
+		}
+
+		// 1 <-> 6
+		for y := 0; y < h; y++ {
+			// 1 -> 6
+			src := Cursor{3 * w, y, 0}
+			dst := Cursor{4*w - 1, 3*h - 1 - y, 2}
+			edgeMap[src] = dst
+
+			// 6 -> 1
+			src = Cursor{4 * w, 3*h - 1 - y, 0}
+			dst = Cursor{3*w - 1, y, 2}
+			edgeMap[src] = dst
+		}
+
+		// 2 <-> 5
+		for x := 0; x < w; x++ {
+			// 2 -> 5
+			src := Cursor{x, 2 * h, 1}
+			dst := Cursor{3*w - 1 - x, 3*h - 1, 3}
+			edgeMap[src] = dst
+
+			// 5 -> 2
+			src = Cursor{3*w - 1 - x, 3 * h, 1}
+			dst = Cursor{x, 2*h - 1, 3}
+			edgeMap[src] = dst
+		}
+
+		// 2 <-> 6
+		for y := 0; y < h; y++ {
+			// 2 -> 6
+			src := Cursor{-1, y + h, 2}
+			dst := Cursor{4*w - 1 - y, 3*h - 1, 3}
+			edgeMap[src] = dst
+
+			// 6 -> 2
+			src = Cursor{4*w - 1 - y, 3 * h, 1}
+			dst = Cursor{0, y + h, 0}
+			edgeMap[src] = dst
+		}
+
+		// 3 <-> 5
+		for x := 0; x < w; x++ {
+			// 3 -> 5
+			src := Cursor{x + w, 2 * h, 1}
+			dst := Cursor{2 * w, 3*h - 1 - x, 0}
+			edgeMap[src] = dst
+
+			// 5 -> 3
+			src = Cursor{2*w - 1, 3*h - 1 - x, 2}
+			dst = Cursor{x + w, 2*h - 1, 3}
+			edgeMap[src] = dst
+		}
+
+		// 4 <-> 6
+		for y := 0; y < h; y++ {
+			// 4 -> 6
+			src := Cursor{3 * w, y + h, 0}
+			dst := Cursor{4*w - 1 - y, 2 * h, 1}
+			edgeMap[src] = dst
+
+			// 6 -> 4
+			src = Cursor{4*w - 1 - y, 2*h - 1, 3}
+			dst = Cursor{3*w - 1, y + h, 2}
+			edgeMap[src] = dst
+		}
+
+		board.edgeMap = edgeMap
+	}
+
+	return board
+}
+
+func (b Board) String() string {
+	return strings.Join(b.tiles, "\n")
 }
 
 func Run(fileName string) Result {
@@ -175,11 +360,8 @@ func Run(fileName string) Result {
 		}
 	}
 
-	board := Board{tiles: tiles, cursor: Cursor{x: x0, y: 0, dir: 0}}
-
 	pathStr := lines[nRows+1]
 	path := []string{}
-
 	i := 0
 	current := ""
 	for i < len(pathStr) {
@@ -196,11 +378,20 @@ func Run(fileName string) Result {
 	}
 	path = append(path, current)
 
+	// Part 1
+	board := MakeBoard(tiles, Cursor{x: x0, y: 0, dir: 0}, false)
 	for _, move := range path {
 		board.Move(move)
 	}
 
 	password := 1000*(board.cursor.y+1) + 4*(board.cursor.x+1) + board.cursor.dir
 
-	return Result{password, 0}
+	// part 2
+	board = MakeBoard(tiles, Cursor{x: x0, y: 0, dir: 0}, true)
+	for _, move := range path {
+		board.Move(move)
+	}
+	password2 := 1000*(board.cursor.y+1) + 4*(board.cursor.x+1) + board.cursor.dir
+
+	return Result{password, password2}
 }
