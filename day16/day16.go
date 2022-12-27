@@ -32,6 +32,7 @@ func AllValvesOpen(valves *map[string]Valve) bool {
 
 func FindPath(valves *map[string]Valve, name string, timeLeft int, targetPressure int) int {
 
+	return 0
 }
 
 func Traverse(valves *map[string]Valve, name string, timeLeft int) int {
