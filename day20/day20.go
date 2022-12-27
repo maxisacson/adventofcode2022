@@ -2,7 +2,6 @@ package day20
 
 import (
 	"aoc22/utils"
-	"fmt"
 	"strconv"
 )
 
@@ -32,17 +31,11 @@ func NewIndex(shift, index, length int) int {
 		return index
 	}
 
-	if index+shift >= length-1 {
-		return (index + shift) % (length - 1)
-	} else if index+shift <= 0 {
-		for index+shift <= 0 {
-			shift += length - 1
-		}
-
-		return index + shift
+	if index+shift <= 0 {
+		return ((index + shift) % (length - 1)) + (length - 1)
 	}
 
-	return index + shift
+	return (index + shift) % (length - 1)
 }
 
 func Shift(list *[]int, index, shift int) int {
@@ -130,41 +123,35 @@ func Run(fileName string) Result {
 
 	// part 1
 	stack := MakeStack(&order)
-	fmt.Println(numbers, order, stack)
 	for len(stack) > 0 {
 		MixOnce(&numbers, &stack, &order)
-		fmt.Println(numbers, order, stack)
 	}
 
 	ind := IndexOf(0, &numbers)
-	// fmt.Println(i)
 	N := len(numbers)
 	sum := numbers[(ind+1000)%N]
 	sum += numbers[(ind+2000)%N]
 	sum += numbers[(ind+3000)%N]
 
-	fmt.Println(numbers[(ind+1000)%N])
-	fmt.Println(numbers[(ind+2000)%N])
-	fmt.Println(numbers[(ind+3000)%N])
-
-	// order = make([]int, len(lines))
+	// part 2
 	for i, line := range lines {
 		numbers[i], _ = strconv.Atoi(line)
-		// numbers[i] *= 811589153
+		numbers[i] *= 811589153
 		order[i] = i
 	}
 
-	for round := 0; round < 2; round++ {
-		fmt.Println("Round", round+1)
+	for round := 0; round < 10; round++ {
 		stack = MakeStack(&order)
-		fmt.Println(numbers, order, Reversed(&stack))
 		for len(stack) > 0 {
 			MixOnce(&numbers, &stack, &order)
-			fmt.Println(numbers, order, Reversed(&stack))
 		}
 		stack = MakeStack(&order)
-		// fmt.Println(numbers, order)
 	}
 
-	return Result{sum, 0}
+	ind = IndexOf(0, &numbers)
+	sum2 := numbers[(ind+1000)%N]
+	sum2 += numbers[(ind+2000)%N]
+	sum2 += numbers[(ind+3000)%N]
+
+	return Result{sum, sum2}
 }
