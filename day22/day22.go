@@ -12,14 +12,16 @@ type Result struct {
 	part2 int
 }
 
-type Cursor struct {
-	x int
-	y int
+const (
+	Right int = iota
+	Down      = iota
+	Left      = iota
+	Up        = iota
+)
 
-	// 0: right >
-	// 1: down  v
-	// 2: left  <
-	// 3: up    ^
+type Cursor struct {
+	x   int
+	y   int
 	dir int
 }
 
@@ -50,19 +52,6 @@ func (b *Board) Move(move string) {
 
 func (b *Board) RotateCursor(dir int) {
 	b.cursor.Rotate(dir)
-
-	bytes := []byte(b.tiles[b.cursor.y])
-	switch b.cursor.dir {
-	case 0:
-		bytes[b.cursor.x] = '>'
-	case 1:
-		bytes[b.cursor.x] = 'v'
-	case 2:
-		bytes[b.cursor.x] = '<'
-	case 3:
-		bytes[b.cursor.x] = '^'
-	}
-	b.tiles[b.cursor.y] = string(bytes)
 }
 
 func Direction(dir int) (int, int) {
@@ -70,13 +59,13 @@ func Direction(dir int) (int, int) {
 	dy := 0
 
 	switch dir {
-	case 0: //right
+	case Right:
 		dx = 1
-	case 1: // down
+	case Down:
 		dy = 1
-	case 2: // left
+	case Left:
 		dx = -1
-	case 3: // up
+	case Up:
 		dy = -1
 	}
 
@@ -102,20 +91,7 @@ func (b *Board) MoveCursor(steps int) {
 			break
 		}
 		b.cursor = next
-		bytes := []byte(b.tiles[b.cursor.y])
-		switch b.cursor.dir {
-		case 0:
-			bytes[b.cursor.x] = '>'
-		case 1:
-			bytes[b.cursor.x] = 'v'
-		case 2:
-			bytes[b.cursor.x] = '<'
-		case 3:
-			bytes[b.cursor.x] = '^'
-		}
-		b.tiles[b.cursor.y] = string(bytes)
 	}
-
 }
 
 func (b *Board) IsValid(x, y int) bool {
@@ -152,7 +128,7 @@ func (b *Board) WrapXFlat(x, y int) int {
 	}
 
 	if (xMin-x) > 1 || (x-xMax) > 1 {
-		panic("Take one step at a time!")
+		panic(fmt.Sprintf("Take one step at a time! y = %d, (%d, %d)", x, xMin, xMax))
 	}
 
 	newX := x
@@ -201,128 +177,132 @@ func (b *Board) WrapYFlat(x, y int) int {
 	return newY
 }
 
-func MakeBoard(tiles []string, cursor Cursor, isCube bool) Board {
+func GetOpposite(dir int) int {
+	return (dir + 2) % 4
+}
+
+func MakeEdgeMap(tiles []string, sides [6]CubeSide) map[Cursor]Cursor {
+	edgeMap := make(map[Cursor]Cursor)
+
+	for _, side := range sides {
+		for dir, link := range side.links {
+			if link == 0 {
+				continue
+			}
+
+			j := link - 1
+			linkSide := side.linkSide[dir]
+			linkParity := side.linkParity[dir]
+			otherSide := sides[j]
+			if link != otherSide.label {
+				panic("mismatched link!")
+			}
+
+			opDir := GetOpposite(linkSide)
+			points := side.GetPoints(dir, 1)
+			otherPoints := otherSide.GetPoints(linkSide, linkParity)
+
+			switch dir {
+			case Right:
+				for i := range points {
+					points[i].x += 1
+				}
+			case Down:
+				for i := range points {
+					points[i].y += 1
+				}
+			case Left:
+				for i := range points {
+					points[i].x -= 1
+				}
+			case Up:
+				for i := range points {
+					points[i].y -= 1
+				}
+			default:
+				panic(fmt.Sprintf("unknown side: %v", dir))
+			}
+
+			for i, p := range points {
+				src := Cursor{p.x, p.y, dir}
+				dst := Cursor{otherPoints[i].x, otherPoints[i].y, opDir}
+				edgeMap[src] = dst
+			}
+		}
+	}
+
+	return edgeMap
+}
+
+type CubeSide struct {
+	x int
+	y int
+	w int
+	h int
+
+	label      int
+	links      [4]int
+	linkSide   [4]int
+	linkParity [4]int
+}
+
+type Vec struct {
+	x int
+	y int
+}
+
+func (s *CubeSide) GetPoints(side, parity int) []Vec {
+	points := []Vec{}
+
+	switch side {
+	case Right:
+		x := s.x + s.w - 1
+		for i := 0; i < s.h; i++ {
+			y := s.y + i
+			points = append(points, Vec{x, y})
+		}
+	case Down:
+		y := s.y + s.h - 1
+		for i := 0; i < s.w; i++ {
+			x := s.x + i
+			points = append(points, Vec{x, y})
+		}
+	case Left:
+		x := s.x
+		for i := 0; i < s.h; i++ {
+			y := s.y + i
+			points = append(points, Vec{x, y})
+		}
+	case Up:
+		y := s.y
+		for i := 0; i < s.w; i++ {
+			x := s.x + i
+			points = append(points, Vec{x, y})
+		}
+	default:
+		panic(fmt.Sprintf("unknown side: %v", side))
+	}
+
+	if parity < 0 {
+		N := len(points)
+		tmp := make([]Vec, N)
+		for i, x := range points {
+			tmp[N-1-i] = x
+		}
+		points = tmp
+	}
+	return points
+}
+
+func MakeBoard(tiles []string, cursor Cursor, isCube bool, cubeSides [6]CubeSide) Board {
 	board := Board{}
 	board.tiles = make([]string, len(tiles))
 	copy(board.tiles, tiles)
 	board.cursor = cursor
 	board.isCube = isCube
 
-	bytes := []byte(board.tiles[cursor.y])
-	switch cursor.dir {
-	case 0:
-		bytes[cursor.x] = '>'
-	case 1:
-		bytes[cursor.x] = 'v'
-	case 2:
-		bytes[cursor.x] = '<'
-	case 3:
-		bytes[cursor.x] = '^'
-	}
-	board.tiles[cursor.y] = string(bytes)
-
-	if isCube {
-		edgeMap := make(map[Cursor]Cursor)
-		nRows := len(tiles)
-		nCols := len(tiles[0])
-		h := nRows / 3
-		w := nCols / 4
-		if h != w {
-			panic(fmt.Sprintf("cube sides not equal: %d %d", w, h))
-		}
-
-		// 1 <-> 2
-		for x := 0; x < w; x++ {
-			// 1 -> 2
-			src := Cursor{x + 2*w, -1, 3}
-			dst := Cursor{w - 1 - x, h, 1}
-			edgeMap[src] = dst
-
-			// 2 -> 1
-			src = Cursor{x, h - 1, 3}
-			dst = Cursor{3*w - 1 - x, 0, 1}
-			edgeMap[src] = dst
-		}
-
-		// 1 <-> 3
-		for y := 0; y < h; y++ {
-			// 1 -> 3
-			src := Cursor{2*w - 1, y, 2}
-			dst := Cursor{y + w, h, 1}
-			edgeMap[src] = dst
-
-			// 3 -> 1
-			src = Cursor{y + w, h - 1, 3}
-			dst = Cursor{2 * w, y, 0}
-			edgeMap[src] = dst
-		}
-
-		// 1 <-> 6
-		for y := 0; y < h; y++ {
-			// 1 -> 6
-			src := Cursor{3 * w, y, 0}
-			dst := Cursor{4*w - 1, 3*h - 1 - y, 2}
-			edgeMap[src] = dst
-
-			// 6 -> 1
-			src = Cursor{4 * w, 3*h - 1 - y, 0}
-			dst = Cursor{3*w - 1, y, 2}
-			edgeMap[src] = dst
-		}
-
-		// 2 <-> 5
-		for x := 0; x < w; x++ {
-			// 2 -> 5
-			src := Cursor{x, 2 * h, 1}
-			dst := Cursor{3*w - 1 - x, 3*h - 1, 3}
-			edgeMap[src] = dst
-
-			// 5 -> 2
-			src = Cursor{3*w - 1 - x, 3 * h, 1}
-			dst = Cursor{x, 2*h - 1, 3}
-			edgeMap[src] = dst
-		}
-
-		// 2 <-> 6
-		for y := 0; y < h; y++ {
-			// 2 -> 6
-			src := Cursor{-1, y + h, 2}
-			dst := Cursor{4*w - 1 - y, 3*h - 1, 3}
-			edgeMap[src] = dst
-
-			// 6 -> 2
-			src = Cursor{4*w - 1 - y, 3 * h, 1}
-			dst = Cursor{0, y + h, 0}
-			edgeMap[src] = dst
-		}
-
-		// 3 <-> 5
-		for x := 0; x < w; x++ {
-			// 3 -> 5
-			src := Cursor{x + w, 2 * h, 1}
-			dst := Cursor{2 * w, 3*h - 1 - x, 0}
-			edgeMap[src] = dst
-
-			// 5 -> 3
-			src = Cursor{2*w - 1, 3*h - 1 - x, 2}
-			dst = Cursor{x + w, 2*h - 1, 3}
-			edgeMap[src] = dst
-		}
-
-		// 4 <-> 6
-		for y := 0; y < h; y++ {
-			// 4 -> 6
-			src := Cursor{3 * w, y + h, 0}
-			dst := Cursor{4*w - 1 - y, 2 * h, 1}
-			edgeMap[src] = dst
-
-			// 6 -> 4
-			src = Cursor{4*w - 1 - y, 2*h - 1, 3}
-			dst = Cursor{3*w - 1, y + h, 2}
-			edgeMap[src] = dst
-		}
-
-		board.edgeMap = edgeMap
+	if board.isCube {
+		board.edgeMap = MakeEdgeMap(tiles, cubeSides)
 	}
 
 	return board
@@ -332,7 +312,148 @@ func (b Board) String() string {
 	return strings.Join(b.tiles, "\n")
 }
 
-func Run(fileName string) Result {
+func MakeCubeSides(w, h int) [6]CubeSide {
+	cubeSides := [6]CubeSide{}
+	if w == 4 {
+		cubeSides[0] = CubeSide{
+			x: 2 * w,
+			y: 0,
+			w: w,
+			h: h,
+
+			label:      1,
+			links:      [4]int{6, 0, 3, 2},
+			linkSide:   [4]int{Right, 0, Up, Up},
+			linkParity: [4]int{-1, 0, 1, -1},
+		}
+		cubeSides[1] = CubeSide{
+			x: 0,
+			y: h,
+			w: w,
+			h: h,
+
+			label:      2,
+			links:      [4]int{0, 5, 6, 1},
+			linkSide:   [4]int{0, Down, Down, Up},
+			linkParity: [4]int{0, -1, -1, -1},
+		}
+		cubeSides[2] = CubeSide{
+			x: w,
+			y: h,
+			w: w,
+			h: h,
+
+			label:      3,
+			links:      [4]int{0, 5, 0, 1},
+			linkSide:   [4]int{0, Left, 0, Left},
+			linkParity: [4]int{0, -1, 0, 1},
+		}
+		cubeSides[3] = CubeSide{
+			x: 2 * w,
+			y: h,
+			w: w,
+			h: h,
+
+			label:      4,
+			links:      [4]int{6, 0, 0, 0},
+			linkSide:   [4]int{Up, 0, 0, 0},
+			linkParity: [4]int{-1, 0, 0, 0},
+		}
+		cubeSides[4] = CubeSide{
+			x: 2 * w,
+			y: 2 * h,
+			w: w,
+			h: h,
+
+			label:      5,
+			links:      [4]int{0, 2, 3, 0},
+			linkSide:   [4]int{0, Down, Down, 0},
+			linkParity: [4]int{0, -1, -1, 0},
+		}
+		cubeSides[5] = CubeSide{
+			x: 3 * w,
+			y: 2 * h,
+			w: w,
+			h: h,
+
+			label:      6,
+			links:      [4]int{1, 2, 0, 4},
+			linkSide:   [4]int{Right, Left, 0, Right},
+			linkParity: [4]int{-1, -1, 0, -1},
+		}
+	} else if w == 50 {
+		cubeSides[0] = CubeSide{
+			x: w,
+			y: 0,
+			w: w,
+			h: h,
+
+			label:      1,
+			links:      [4]int{0, 0, 4, 6},
+			linkSide:   [4]int{0, 0, Left, Left},
+			linkParity: [4]int{0, 0, -1, 1},
+		}
+		cubeSides[1] = CubeSide{
+			x: 2 * w,
+			y: 0,
+			w: w,
+			h: h,
+
+			label:      2,
+			links:      [4]int{5, 3, 0, 6},
+			linkSide:   [4]int{Right, Right, 0, Down},
+			linkParity: [4]int{-1, 1, 0, 1},
+		}
+		cubeSides[2] = CubeSide{
+			x: w,
+			y: h,
+			w: w,
+			h: h,
+
+			label:      3,
+			links:      [4]int{2, 0, 4, 0},
+			linkSide:   [4]int{Down, 0, Up, 0},
+			linkParity: [4]int{1, 0, 1, 0},
+		}
+		cubeSides[3] = CubeSide{
+			x: 0,
+			y: 2 * h,
+			w: w,
+			h: h,
+
+			label:      4,
+			links:      [4]int{0, 0, 1, 3},
+			linkSide:   [4]int{0, 0, Left, Left},
+			linkParity: [4]int{0, 0, -1, 1},
+		}
+		cubeSides[4] = CubeSide{
+			x: w,
+			y: 2 * h,
+			w: w,
+			h: h,
+
+			label:      5,
+			links:      [4]int{2, 6, 0, 0},
+			linkSide:   [4]int{Right, Right, 0, 0},
+			linkParity: [4]int{-1, 1, 0, 0},
+		}
+		cubeSides[5] = CubeSide{
+			x: 0,
+			y: 3 * h,
+			w: w,
+			h: h,
+
+			label:      6,
+			links:      [4]int{5, 2, 1, 0},
+			linkSide:   [4]int{Down, Up, Up, 0},
+			linkParity: [4]int{1, 1, 1, 0},
+		}
+	}
+
+	return cubeSides
+}
+
+func Run(fileName string, sideSize int) Result {
 	lines := utils.ReadFileToLines(fileName)
 
 	nRows := len(lines) - 2
@@ -379,7 +500,7 @@ func Run(fileName string) Result {
 	path = append(path, current)
 
 	// Part 1
-	board := MakeBoard(tiles, Cursor{x: x0, y: 0, dir: 0}, false)
+	board := MakeBoard(tiles, Cursor{x: x0, y: 0, dir: Right}, false, [6]CubeSide{})
 	for _, move := range path {
 		board.Move(move)
 	}
@@ -387,7 +508,8 @@ func Run(fileName string) Result {
 	password := 1000*(board.cursor.y+1) + 4*(board.cursor.x+1) + board.cursor.dir
 
 	// part 2
-	board = MakeBoard(tiles, Cursor{x: x0, y: 0, dir: 0}, true)
+	cubeSides := MakeCubeSides(sideSize, sideSize)
+	board = MakeBoard(tiles, Cursor{x: x0, y: 0, dir: Right}, true, cubeSides)
 	for _, move := range path {
 		board.Move(move)
 	}
