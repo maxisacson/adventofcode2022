@@ -10,15 +10,15 @@ func TestDay22(t *testing.T) {
 
 	{
 		expected := Result{6032, 5031}
-		actual := Run("example.txt")
+		actual := Run("example.txt", 4)
 		if actual != expected {
 			t.Errorf("Expected: %d but got: %d\n", expected, actual)
 		}
 	}
 
 	{
-		expected := Result{181128, 0}
-		actual := Run("input.txt")
+		expected := Result{181128, 52311}
+		actual := Run("input.txt", 50)
 		if actual != expected {
 			t.Errorf("Expected: %d but got: %d\n", expected, actual)
 		}
