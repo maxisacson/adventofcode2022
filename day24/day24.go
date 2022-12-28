@@ -2,7 +2,7 @@ package day24
 
 import (
 	"aoc22/utils"
-	"fmt"
+	"strings"
 )
 
 type Result struct {
@@ -46,31 +46,59 @@ func Pop(list *[]byte) byte {
 	return r
 }
 
+type Node struct {
+	pos  Vec
+	next []*Node
+	prev *Node
+	dist int
+}
+
 type Board struct {
-	tiles [][]Tile
-	start Vec
-	goal  Vec
+	tiles    [][]Tile
+	start    Vec
+	goal     Vec
+	path     *Node
+	frontier []*Node
+	ends     []*Node
 }
 
 func (b Board) String() string {
-	s := ""
+	nRows := len(b.tiles)
+	offset := len(b.tiles[0]) + 1
+	nCols := 2*len(b.tiles[0]) + 1
+
+	bytes := make([][]byte, nRows)
 	for i, row := range b.tiles {
-		for _, tile := range row {
+		bytes[i] = make([]byte, nCols)
+		for j, tile := range row {
 			if tile.tile == 'B' {
 				if len(tile.blizzards) == 1 {
-					s += string(tile.blizzards[0])
+					bytes[i][j] = tile.blizzards[0]
+					bytes[i][j+offset] = tile.blizzards[0]
 				} else {
-					s += fmt.Sprint(len(tile.blizzards))
+					bytes[i][j] = byte('0' + len(tile.blizzards))
+					bytes[i][j+offset] = byte('0' + len(tile.blizzards))
 				}
 			} else {
-				s += fmt.Sprint(string(tile.tile))
+				bytes[i][j] = tile.tile
+				bytes[i][j+offset] = tile.tile
 			}
-		}
-		if i < len(b.tiles)-1 {
-			s += "\n"
+			// bytes[i][j] = tile.tile
+			// bytes[i][j+offset] = tile.tile
+			bytes[i][offset-1] = ' '
 		}
 	}
-	return s
+
+	for _, n := range b.frontier {
+		bytes[n.pos.y][n.pos.x+offset] = '@'
+	}
+
+	lines := make([]string, nRows)
+	for i := range lines {
+		lines[i] = string(bytes[i])
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func GetBlizzardDir(b byte) (int, int) {
@@ -90,6 +118,43 @@ func GetBlizzardDir(b byte) (int, int) {
 
 func (b *Board) IsWall(x, y int) bool {
 	return (b.tiles[y][x].tile == '#')
+}
+
+func (b *Board) IsBlizzard(x, y int) bool {
+	return (b.tiles[y][x].tile == 'B')
+}
+
+func (b *Board) Adjacent(x, y int) []Vec {
+	points := []Vec{}
+	yMax := len(b.tiles) - 1
+	xMax := len(b.tiles[0]) - 1
+
+	for dy := -1; dy <= 1; dy++ {
+		newY := y + dy
+		if newY < 0 || newY > yMax {
+			continue
+		}
+		for dx := -1; dx <= 1; dx++ {
+			newX := x + dx
+			if newX < 0 || newX > xMax {
+				continue
+			}
+
+			if dx*dy != 0 {
+				continue
+			}
+
+			if dx == 0 && dy == 0 {
+				continue
+			}
+
+			if !b.IsWall(newX, newY) {
+				points = append(points, Vec{newX, newY})
+			}
+		}
+	}
+
+	return points
 }
 
 func (b *Board) Round() {
@@ -119,9 +184,9 @@ func (b *Board) Round() {
 				dx, dy := GetBlizzardDir(bliz)
 				if b.IsWall(x+dx, y+dy) {
 					// Create new blizzard at opposite wall
-					newX := x - dx
-					newY := y - dy
-					for !b.IsWall(newX, newY) {
+					newX := x
+					newY := y
+					for !b.IsWall(newX-dx, newY-dy) {
 						newX -= dx
 						newY -= dy
 					}
@@ -136,8 +201,74 @@ func (b *Board) Round() {
 			}
 		}
 	}
-
 	b.tiles = tiles
+
+	frontierMap := map[Vec]*Node{}
+	for _, n := range b.frontier {
+		for _, p := range b.Adjacent(n.pos.x, n.pos.y) {
+			if n.prev != nil && p == n.prev.pos {
+				continue
+			}
+			if b.IsBlizzard(p.x, p.y) {
+				continue
+			}
+			next := new(Node)
+			next.prev = n
+			next.pos = p
+			next.dist = n.dist + 1
+			tmp, ok := frontierMap[p]
+			if ok {
+				if next.dist < tmp.dist {
+					*tmp = *next
+				}
+			} else {
+				frontierMap[p] = next
+			}
+			n.next = append(n.next, frontierMap[p])
+
+			if p == b.goal {
+				b.ends = append(b.ends, next)
+			}
+			// fmt.Println(p)
+		}
+		if !b.IsBlizzard(n.pos.x, n.pos.y) {
+			next := new(Node)
+			next.prev = n
+			next.pos = n.pos
+			next.dist = n.dist + 1
+			n.next = append(n.next, next)
+			frontierMap[next.pos] = next
+		}
+	}
+
+	frontier := []*Node{}
+
+	for _, v := range frontierMap {
+		frontier = append(frontier, v)
+	}
+
+	b.frontier = frontier
+}
+
+func (b *Board) ShortestPath() []Vec {
+	path := []Vec{}
+
+	var next *Node
+	minDist := -1
+
+	for _, n := range b.ends {
+		if minDist == -1 || n.dist < minDist {
+			minDist = n.dist
+			next = n
+		}
+	}
+
+	for next != nil {
+		path = append(path, next.pos)
+		next = next.prev
+	}
+
+	return path
 }
 
 func Run(fileName string) Result {
@@ -148,10 +279,11 @@ func Run(fileName string) Result {
 
 	board := Board{}
 	board.tiles = make([][]Tile, nRows)
+	tiles := make([][]Tile, nRows)
 	for i, line := range lines {
-		board.tiles[i] = make([]Tile, nCols)
+		tiles[i] = make([]Tile, nCols)
 		for j, b := range line {
-			board.tiles[i][j] = MakeTile(byte(b))
+			tiles[i][j] = MakeTile(byte(b))
 			if i == 0 && b == '.' {
 				board.start = Vec{j, i}
 			}
@@ -160,17 +292,25 @@ func Run(fileName string) Result {
 			}
 		}
 	}
+	copy(board.tiles, tiles)
+	root := Node{board.start, []*Node{}, nil, 0}
+	board.path = &root
+	board.frontier = append(board.frontier, board.path)
 
-	fmt.Println("start:", board.start)
-	fmt.Println("goal:", board.goal)
-	fmt.Println(board)
-	fmt.Println()
+	// fmt.Println("start:", board.start)
+	// fmt.Println("goal:", board.goal)
+	// fmt.Println(board)
+	// fmt.Println()
 
-	for i := 0; i < 10; i++ {
+	// for i := 0; i < 18; i++ {
+	for len(board.ends) == 0 {
 		board.Round()
-		fmt.Println(board)
-		fmt.Println()
+		// fmt.Println(len(board.frontier))
+		// fmt.Println("Minute", i+1)
+		// fmt.Println(board)
+		// fmt.Println()
 	}
+	steps := len(board.ShortestPath()) - 1
 
-	return Result{len(lines), len(lines)}
+	return Result{steps, 0}
 }
