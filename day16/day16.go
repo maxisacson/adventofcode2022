@@ -20,8 +20,15 @@ type Valve struct {
 	openTime int
 }
 
-func AllValvesOpen(valves *map[string]Valve) bool {
-	for _, v := range *valves {
+type Cave struct {
+	pos      string
+	valves   map[string]Valve
+	timeLeft int
+	pressure int
+}
+
+func AllValvesOpen(valves map[string]Valve) bool {
+	for _, v := range valves {
 		if v.flowRate > 0 && !v.isOpen {
 			return false
 		}
@@ -30,35 +37,77 @@ func AllValvesOpen(valves *map[string]Valve) bool {
 	return true
 }
 
-func FindPath(valves *map[string]Valve, name string, timeLeft int, targetPressure int) int {
-
-	return 0
+func copyValves(valves map[string]Valve) map[string]Valve {
+	ret := make(map[string]Valve)
+	for k, v := range valves {
+		ret[k] = v
+	}
+	return ret
 }
 
-func Traverse(valves *map[string]Valve, name string, timeLeft int) int {
-	pressure := 0
+func copyInto(dst *map[string]Valve, src map[string]Valve) {
+	for k, v := range src {
+		(*dst)[k] = v
+	}
+}
 
+func Traverse(valves map[string]Valve, name string, timeLeft int, path *[]string) int {
 	if timeLeft <= 0 {
-		return pressure
+		return 0
 	}
 
 	if AllValvesOpen(valves) {
-		return pressure
+		return 0
 	}
 
-	valve := (*valves)[name]
-
-	// Potential pressure release for this valve
-	localPressure := valve.flowRate * (timeLeft - 1)
+	valve := valves[name]
+	valvesOpen := copyValves(valves)
+	valvesClosed := copyValves(valves)
+	*path = append(*path, fmt.Sprintf("%s:%d", name, timeLeft))
+	newPath := []string{}
 
 	maxPressure := -1
-	for _, next := range valve.tunnels {
-		thisPressure := FindPath(valves, next, timeLeft-1, localPressure)
-		if thisPressure > maxPressure {
-			maxPressure = thisPressure
+	if !valve.isOpen && valve.flowRate > 0 {
+		pressure := valve.flowRate * (timeLeft - 1)
+		valve.isOpen = true
+		valvesOpen[name] = valve
+		valvesCopy := copyValves(valvesOpen)
+
+		pathCopy := make([]string, len(*path))
+		copy(pathCopy, *path)
+		pathCopy = append(pathCopy, fmt.Sprintf("%s:%d", name, timeLeft-1))
+		// fmt.Println(pathCopy)
+
+		for _, next := range valve.tunnels {
+			thisPressure := pressure + Traverse(valvesCopy, next, timeLeft-2, &pathCopy)
+			if thisPressure > maxPressure {
+				maxPressure = thisPressure
+				copyInto(&valves, valvesCopy)
+				newPath = pathCopy
+			}
 		}
 	}
 
+	for _, next := range valve.tunnels {
+		valvesCopy := copyValves(valvesClosed)
+
+		pathCopy := make([]string, len(*path))
+		copy(pathCopy, *path)
+		// fmt.Println(pathCopy)
+
+		thisPressure := Traverse(valvesCopy, next, timeLeft-1, &pathCopy)
+		if thisPressure > maxPressure {
+			maxPressure = thisPressure
+			copyInto(&valves, valvesCopy)
+			newPath = pathCopy
+		}
+	}
+
+	// for _, v := range valves {
+	// 	fmt.Println(v.name, v.isOpen)
+	// }
+	// fmt.Println()
+	*path = newPath
 	return maxPressure
 }
 
@@ -77,11 +126,18 @@ func Run(fileName string) Result {
 		fmt.Println(valves[valve])
 	}
 	fmt.Println()
+	cave := Cave{}
+	cave.valves = valves
+	cave.pos = "AA"
+	cave.timeLeft = 24
 
-	pressure := Traverse(&valves, "AA", 13)
+	pressure := 0
+	path := []string{}
+	pressure = Traverse(valves, "AA", 5, &path)
 
+	fmt.Println(path)
 	for _, v := range valves {
-		fmt.Println(v)
+		fmt.Println(v.name, v.isOpen)
 	}
 	fmt.Println()
 
