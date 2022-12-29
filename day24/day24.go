@@ -2,6 +2,7 @@ package day24
 
 import (
 	"aoc22/utils"
+	"fmt"
 	"strings"
 )
 
@@ -57,7 +58,6 @@ type Board struct {
 	tiles    [][]Tile
 	start    Vec
 	goal     Vec
-	path     *Node
 	frontier []*Node
 	ends     []*Node
 }
@@ -254,6 +254,7 @@ func (b *Board) ShortestPath() []Vec {
 	path := []Vec{}
 
 	var next *Node
+	next = nil
 	minDist := -1
 
 	for _, n := range b.ends {
@@ -271,46 +272,62 @@ func (b *Board) ShortestPath() []Vec {
 	return path
 }
 
+func MakeBoard(tiles [][]Tile, start, goal Vec) Board {
+	board := Board{}
+	board.start = start
+	board.goal = goal
+	board.tiles = make([][]Tile, len(tiles))
+	copy(board.tiles, tiles)
+	root := Node{start, []*Node{}, nil, 0}
+	board.frontier = []*Node{&root}
+	return board
+}
+
 func Run(fileName string) Result {
 	lines := utils.ReadFileToLines(fileName)
 
 	nRows := len(lines)
 	nCols := len(lines[0])
 
-	board := Board{}
-	board.tiles = make([][]Tile, nRows)
 	tiles := make([][]Tile, nRows)
+	start := Vec{}
+	goal := Vec{}
 	for i, line := range lines {
 		tiles[i] = make([]Tile, nCols)
 		for j, b := range line {
 			tiles[i][j] = MakeTile(byte(b))
 			if i == 0 && b == '.' {
-				board.start = Vec{j, i}
+				start = Vec{j, i}
 			}
 			if i == nRows-1 && b == '.' {
-				board.goal = Vec{j, i}
+				goal = Vec{j, i}
 			}
 		}
 	}
-	copy(board.tiles, tiles)
-	root := Node{board.start, []*Node{}, nil, 0}
-	board.path = &root
-	board.frontier = append(board.frontier, board.path)
 
-	// fmt.Println("start:", board.start)
-	// fmt.Println("goal:", board.goal)
-	// fmt.Println(board)
-	// fmt.Println()
+	board := MakeBoard(tiles, start, goal)
 
-	// for i := 0; i < 18; i++ {
+	// Part 1
 	for len(board.ends) == 0 {
 		board.Round()
-		// fmt.Println(len(board.frontier))
-		// fmt.Println("Minute", i+1)
-		// fmt.Println(board)
-		// fmt.Println()
 	}
 	steps := len(board.ShortestPath()) - 1
+	fmt.Println(steps, len(board.ends))
 
-	return Result{steps, 0}
+	// Part 2
+	board = MakeBoard(board.tiles, goal, start)
+	for len(board.ends) == 0 {
+		board.Round()
+	}
+	steps2 := len(board.ShortestPath()) - 1
+	fmt.Println(steps2, len(board.ends))
+
+	board = MakeBoard(board.tiles, start, goal)
+	for len(board.ends) == 0 {
+		board.Round()
+	}
+	steps3 := len(board.ShortestPath()) - 1
+	fmt.Println(steps3, len(board.ends))
+
+	return Result{steps, steps + steps2 + steps3}
 }
