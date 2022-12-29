@@ -20,13 +20,6 @@ type Valve struct {
 	openTime int
 }
 
-type Cave struct {
-	pos      string
-	valves   map[string]Valve
-	timeLeft int
-	pressure int
-}
-
 func AllValvesOpen(valves map[string]Valve) bool {
 	for _, v := range valves {
 		if v.flowRate > 0 && !v.isOpen {
@@ -51,8 +44,8 @@ func copyInto(dst *map[string]Valve, src map[string]Valve) {
 	}
 }
 
-func Traverse(valves map[string]Valve, name string, timeLeft int, path *[]string) int {
-	if timeLeft <= 0 {
+func Traverse(valves map[string]Valve, name string, previous string, timeLeft int, path *[]string) int {
+	if timeLeft <= 1 {
 		return 0
 	}
 
@@ -71,15 +64,15 @@ func Traverse(valves map[string]Valve, name string, timeLeft int, path *[]string
 		pressure := valve.flowRate * (timeLeft - 1)
 		valve.isOpen = true
 		valvesOpen[name] = valve
-		valvesCopy := copyValves(valvesOpen)
-
-		pathCopy := make([]string, len(*path))
-		copy(pathCopy, *path)
-		pathCopy = append(pathCopy, fmt.Sprintf("%s:%d", name, timeLeft-1))
-		// fmt.Println(pathCopy)
 
 		for _, next := range valve.tunnels {
-			thisPressure := pressure + Traverse(valvesCopy, next, timeLeft-2, &pathCopy)
+			valvesCopy := copyValves(valvesOpen)
+
+			pathCopy := make([]string, len(*path))
+			copy(pathCopy, *path)
+			pathCopy = append(pathCopy, fmt.Sprintf("%s:%d", name, timeLeft-1))
+
+			thisPressure := pressure + Traverse(valvesCopy, next, name, timeLeft-2, &pathCopy)
 			if thisPressure > maxPressure {
 				maxPressure = thisPressure
 				copyInto(&valves, valvesCopy)
@@ -89,13 +82,15 @@ func Traverse(valves map[string]Valve, name string, timeLeft int, path *[]string
 	}
 
 	for _, next := range valve.tunnels {
+		if next == previous {
+			continue
+		}
 		valvesCopy := copyValves(valvesClosed)
 
 		pathCopy := make([]string, len(*path))
 		copy(pathCopy, *path)
-		// fmt.Println(pathCopy)
 
-		thisPressure := Traverse(valvesCopy, next, timeLeft-1, &pathCopy)
+		thisPressure := Traverse(valvesCopy, next, name, timeLeft-1, &pathCopy)
 		if thisPressure > maxPressure {
 			maxPressure = thisPressure
 			copyInto(&valves, valvesCopy)
@@ -121,25 +116,31 @@ func Run(fileName string) Result {
 		fields0 := strings.Fields(parts[0])
 		valve := fields0[1]
 		flowRate, _ := strconv.Atoi(strings.Split(fields0[4], "=")[1])
-		connections := strings.Split(parts[1][23:len(parts[1])], ", ")
+		var connections []string
+		if parts[1][16:22] == "valves" {
+			connections = strings.Split(parts[1][23:len(parts[1])], ", ")
+		} else {
+			connections = []string{parts[1][22:len(parts[1])]}
+		}
 		valves[valve] = Valve{valve, flowRate, connections, false, 0}
-		fmt.Println(valves[valve])
+		// fmt.Println(valves[valve])
 	}
-	fmt.Println()
-	cave := Cave{}
-	cave.valves = valves
-	cave.pos = "AA"
-	cave.timeLeft = 24
+	// fmt.Println()
+	// cave := Cave{}
+	// cave.valves = valves
+	// cave.pos = "AA"
+	// cave.timeLeft = 24
 
 	pressure := 0
 	path := []string{}
-	pressure = Traverse(valves, "AA", 5, &path)
+	pressure = Traverse(valves, "AA", "", 30, &path)
 
 	fmt.Println(path)
-	for _, v := range valves {
-		fmt.Println(v.name, v.isOpen)
-	}
-	fmt.Println()
+	fmt.Println(pressure)
+	// for _, v := range valves {
+	// 	fmt.Println(v.name, v.isOpen, v.flowRate)
+	// }
+	// fmt.Println()
 
 	return Result{pressure, 0}
 }
