@@ -17,7 +17,22 @@ type Valve struct {
 	flowRate int
 	tunnels  []string
 	isOpen   bool
-	openTime int
+}
+
+type Edge struct {
+	to   string
+	from string
+	cost int
+}
+
+type Node struct {
+	label string
+	value int
+	edges []Edge
+}
+
+type Graph struct {
+	nodes map[string]Node
 }
 
 func AllValvesOpen(valves map[string]Valve) bool {
@@ -44,7 +59,7 @@ func copyInto(dst *map[string]Valve, src map[string]Valve) {
 	}
 }
 
-func Traverse(valves map[string]Valve, name string, previous string, timeLeft int, path *[]string) int {
+func Traverse(graph Graph, valves map[string]Valve, name string, previous string, timeLeft int, path *[]string) int {
 	if timeLeft <= 1 {
 		return 0
 	}
@@ -59,20 +74,28 @@ func Traverse(valves map[string]Valve, name string, previous string, timeLeft in
 	*path = append(*path, fmt.Sprintf("%s:%d", name, timeLeft))
 	newPath := []string{}
 
+	node := graph.nodes[name]
+
 	maxPressure := -1
 	if !valve.isOpen && valve.flowRate > 0 {
 		pressure := valve.flowRate * (timeLeft - 1)
 		valve.isOpen = true
 		valvesOpen[name] = valve
 
-		for _, next := range valve.tunnels {
+		for _, edge := range node.edges {
+			timeLeftNext := timeLeft - 1 - edge.cost
+			if timeLeftNext < 1 {
+				continue
+			}
+
+			next := edge.to
 			valvesCopy := copyValves(valvesOpen)
 
 			pathCopy := make([]string, len(*path))
 			copy(pathCopy, *path)
 			pathCopy = append(pathCopy, fmt.Sprintf("%s:%d", name, timeLeft-1))
 
-			thisPressure := pressure + Traverse(valvesCopy, next, name, timeLeft-2, &pathCopy)
+			thisPressure := pressure + Traverse(graph, valvesCopy, next, name, timeLeftNext, &pathCopy)
 			if thisPressure > maxPressure {
 				maxPressure = thisPressure
 				copyInto(&valves, valvesCopy)
@@ -81,8 +104,13 @@ func Traverse(valves map[string]Valve, name string, previous string, timeLeft in
 		}
 	}
 
-	for _, next := range valve.tunnels {
+	for _, edge := range node.edges {
+		next := edge.to
 		if next == previous {
+			continue
+		}
+		timeLeftNext := timeLeft - edge.cost
+		if timeLeftNext < 1 {
 			continue
 		}
 		valvesCopy := copyValves(valvesClosed)
@@ -90,7 +118,7 @@ func Traverse(valves map[string]Valve, name string, previous string, timeLeft in
 		pathCopy := make([]string, len(*path))
 		copy(pathCopy, *path)
 
-		thisPressure := Traverse(valvesCopy, next, name, timeLeft-1, &pathCopy)
+		thisPressure := Traverse(graph, valvesCopy, next, name, timeLeftNext, &pathCopy)
 		if thisPressure > maxPressure {
 			maxPressure = thisPressure
 			copyInto(&valves, valvesCopy)
@@ -104,6 +132,74 @@ func Traverse(valves map[string]Valve, name string, previous string, timeLeft in
 	// fmt.Println()
 	*path = newPath
 	return maxPressure
+}
+
+func BuildGraph(valves map[string]Valve) Graph {
+	graph := Graph{}
+	graph.nodes = make(map[string]Node)
+	for k, v := range valves {
+		node := Node{}
+		node.label = k
+		node.value = v.flowRate
+		for _, next := range v.tunnels {
+			edge := Edge{}
+			edge.to = next
+			edge.from = node.label
+			edge.cost = 1
+			node.edges = append(node.edges, edge)
+		}
+		graph.nodes[node.label] = node
+	}
+	return graph
+}
+
+func (g *Graph) Contract() {
+	newNodes := make(map[string]Node)
+	for _, node := range g.nodes {
+		edges := []Edge{}
+		for _, edge := range node.edges {
+			contracted := g.ContractEdge(edge)
+			edges = append(edges, contracted...)
+		}
+		node.edges = edges
+		newNodes[node.label] = node
+	}
+	g.nodes = newNodes
+}
+
+func (g *Graph) ContractEdge(edge Edge) []Edge {
+	contracted := []Edge{}
+	if g.nodes[edge.to].value > 0 {
+		contracted = append(contracted, edge)
+		return contracted
+	}
+
+	to := g.nodes[edge.to]
+	for _, e := range to.edges {
+		if e.to == edge.from {
+			continue
+		}
+		tmp := g.ContractEdge(e)
+		for i := range tmp {
+			tmp[i].from = edge.from
+			tmp[i].cost += edge.cost
+		}
+		contracted = append(contracted, tmp...)
+	}
+
+	return contracted
+}
+
+func (g Graph) String() string {
+	lines := []string{}
+	for _, node := range g.nodes {
+		for _, edge := range node.edges {
+			to := g.nodes[edge.to]
+			lines = append(lines, fmt.Sprintf("%s(%d) -{%d}-> %s(%d)", node.label, node.value, edge.cost, to.label, to.value))
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func Run(fileName string) Result {
@@ -122,18 +218,22 @@ func Run(fileName string) Result {
 		} else {
 			connections = []string{parts[1][22:len(parts[1])]}
 		}
-		valves[valve] = Valve{valve, flowRate, connections, false, 0}
+		valves[valve] = Valve{valve, flowRate, connections, false}
 		// fmt.Println(valves[valve])
 	}
 	// fmt.Println()
-	// cave := Cave{}
-	// cave.valves = valves
-	// cave.pos = "AA"
-	// cave.timeLeft = 24
+
+	graph := BuildGraph(valves)
+	// fmt.Println(graph)
+	// fmt.Println()
+	graph.Contract()
+	// fmt.Println(graph)
+	// fmt.Println()
 
 	pressure := 0
 	path := []string{}
-	pressure = Traverse(valves, "AA", "", 30, &path)
+	// pressure = Traverse(graph, valves, "AA", "", 30, &path)
+	pressure = Traverse(graph, valves, "AA", "", 30, &path)
 
 	fmt.Println(path)
 	fmt.Println(pressure)
