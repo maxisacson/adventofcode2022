@@ -69,68 +69,71 @@ func Traverse(graph Graph, valves map[string]Valve, name string, previous string
 	}
 
 	valve := valves[name]
-	valvesOpen := copyValves(valves)
-	valvesClosed := copyValves(valves)
-	*path = append(*path, fmt.Sprintf("%s:%d", name, timeLeft))
-	newPath := []string{}
+	// valvesOpen := copyValves(valves)
+	// valvesClosed := copyValves(valves)
+	// *path = append(*path, fmt.Sprintf("%s:%d", name, timeLeft))
+	// newPath := []string{}
 
 	node := graph.nodes[name]
 
 	maxPressure := -1
 	if !valve.isOpen && valve.flowRate > 0 {
 		pressure := valve.flowRate * (timeLeft - 1)
-		valve.isOpen = true
-		valvesOpen[name] = valve
+		// valve.isOpen = true
+		// valvesOpen[name] = valve
 
 		for _, edge := range node.edges {
 			timeLeftNext := timeLeft - 1 - edge.cost
-			if timeLeftNext < 1 {
-				continue
-			}
+			// if timeLeftNext < 1 {
+			// 	continue
+			// }
 
-			next := edge.to
-			valvesCopy := copyValves(valvesOpen)
+			// next := edge.to
+			// valvesCopy := copyValves(valvesOpen)
 
-			pathCopy := make([]string, len(*path))
-			copy(pathCopy, *path)
-			pathCopy = append(pathCopy, fmt.Sprintf("%s:%d", name, timeLeft-1))
+			// pathCopy := make([]string, len(*path))
+			// copy(pathCopy, *path)
+			// pathCopy = append(pathCopy, fmt.Sprintf("%s:%d", name, timeLeft-1))
 
-			thisPressure := pressure + Traverse(graph, valvesCopy, next, name, timeLeftNext, &pathCopy)
+			valve.isOpen = true
+			// valvesOpen[name] = valve
+			valves[name] = valve
+
+			thisPressure := pressure + Traverse(graph, valves, edge.to, name, timeLeftNext, path)
+
 			if thisPressure > maxPressure {
 				maxPressure = thisPressure
-				copyInto(&valves, valvesCopy)
-				newPath = pathCopy
+				// copyInto(&valves, valvesOpen)
+				// newPath = pathCopy
 			}
+
+			valve.isOpen = false
+			valves[name] = valve
 		}
 	}
 
 	for _, edge := range node.edges {
-		next := edge.to
-		if next == previous {
+		if edge.to == previous {
 			continue
 		}
 		timeLeftNext := timeLeft - edge.cost
-		if timeLeftNext < 1 {
-			continue
-		}
-		valvesCopy := copyValves(valvesClosed)
+		// if timeLeftNext <= 1 {
+		// 	continue
+		// }
+		// valvesCopy := copyValves(valvesClosed)
 
-		pathCopy := make([]string, len(*path))
-		copy(pathCopy, *path)
+		// pathCopy := make([]string, len(*path))
+		// copy(pathCopy, *path)
 
-		thisPressure := Traverse(graph, valvesCopy, next, name, timeLeftNext, &pathCopy)
+		thisPressure := Traverse(graph, valves, edge.to, name, timeLeftNext, path)
 		if thisPressure > maxPressure {
 			maxPressure = thisPressure
-			copyInto(&valves, valvesCopy)
-			newPath = pathCopy
+			// copyInto(&valves, valvesClosed)
+			// newPath = pathCopy
 		}
 	}
 
-	// for _, v := range valves {
-	// 	fmt.Println(v.name, v.isOpen)
-	// }
-	// fmt.Println()
-	*path = newPath
+	// *path = newPath
 	return maxPressure
 }
 
@@ -232,7 +235,7 @@ func Run(fileName string) Result {
 
 	pressure := 0
 	path := []string{}
-	// pressure = Traverse(graph, valves, "AA", "", 30, &path)
+	// pressure = Traverse(graph, valves, "AA", "", 25, &path)
 	pressure = Traverse(graph, valves, "AA", "", 30, &path)
 
 	fmt.Println(path)
