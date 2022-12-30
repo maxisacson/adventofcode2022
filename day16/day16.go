@@ -59,7 +59,7 @@ func copyInto(dst *map[string]Valve, src map[string]Valve) {
 	}
 }
 
-func Traverse(graph Graph, valves map[string]Valve, name string, previous string, timeLeft int, path *[]string) int {
+func Traverse(graph Graph, valves map[string]Valve, name string, previous string, timeLeft int) int {
 	if timeLeft <= 1 {
 		return 0
 	}
@@ -69,46 +69,27 @@ func Traverse(graph Graph, valves map[string]Valve, name string, previous string
 	}
 
 	valve := valves[name]
-	// valvesOpen := copyValves(valves)
-	// valvesClosed := copyValves(valves)
-	// *path = append(*path, fmt.Sprintf("%s:%d", name, timeLeft))
-	// newPath := []string{}
-
 	node := graph.nodes[name]
 
 	maxPressure := -1
 	if !valve.isOpen && valve.flowRate > 0 {
 		pressure := valve.flowRate * (timeLeft - 1)
-		// valve.isOpen = true
-		// valvesOpen[name] = valve
 
 		for _, edge := range node.edges {
 			timeLeftNext := timeLeft - 1 - edge.cost
-			// if timeLeftNext < 1 {
-			// 	continue
-			// }
-
-			// next := edge.to
-			// valvesCopy := copyValves(valvesOpen)
-
-			// pathCopy := make([]string, len(*path))
-			// copy(pathCopy, *path)
-			// pathCopy = append(pathCopy, fmt.Sprintf("%s:%d", name, timeLeft-1))
 
 			valve.isOpen = true
-			// valvesOpen[name] = valve
 			valves[name] = valve
 
-			thisPressure := pressure + Traverse(graph, valves, edge.to, name, timeLeftNext, path)
-
-			if thisPressure > maxPressure {
-				maxPressure = thisPressure
-				// copyInto(&valves, valvesOpen)
-				// newPath = pathCopy
-			}
+			thisPressure := pressure + Traverse(graph, valves, edge.to, name, timeLeftNext)
 
 			valve.isOpen = false
 			valves[name] = valve
+
+			if thisPressure > maxPressure {
+				maxPressure = thisPressure
+			}
+
 		}
 	}
 
@@ -117,23 +98,71 @@ func Traverse(graph Graph, valves map[string]Valve, name string, previous string
 			continue
 		}
 		timeLeftNext := timeLeft - edge.cost
-		// if timeLeftNext <= 1 {
-		// 	continue
-		// }
-		// valvesCopy := copyValves(valvesClosed)
 
-		// pathCopy := make([]string, len(*path))
-		// copy(pathCopy, *path)
-
-		thisPressure := Traverse(graph, valves, edge.to, name, timeLeftNext, path)
+		thisPressure := Traverse(graph, valves, edge.to, name, timeLeftNext)
 		if thisPressure > maxPressure {
 			maxPressure = thisPressure
-			// copyInto(&valves, valvesClosed)
-			// newPath = pathCopy
 		}
 	}
 
-	// *path = newPath
+	return maxPressure
+}
+
+func TraverseDouble(graph Graph, valves map[string]Valve, name1, name2, prev1, prev2 string, timeLeft1, timeLeft2 int) int {
+	if timeLeft1 <= 1 && timeLeft2 <= 1 {
+		return 0
+	}
+
+	if AllValvesOpen(valves) {
+		return 0
+	}
+
+	valve1 := valves[name1]
+
+	node1 := graph.nodes[name1]
+
+	maxPressure := -1
+
+	if !valve1.isOpen && valve1.flowRate > 0 {
+		pressure := valve1.flowRate * (timeLeft1 - 1)
+
+		for _, edge1 := range node1.edges {
+			timeLeftNext1 := timeLeft1 - 1 - edge1.cost
+
+			valve1.isOpen = true
+			valves[name1] = valve1
+
+			valve2 := valves[name2]
+			node2 := graph.nodes[name2]
+
+			if !valve2.isOpen && valve2.flowRate > 0 {
+
+				for _, edge2 := range node2.edges {
+					timeLeftNext2 := timeLeft2 - 1 - edge2.cost
+					if timeLeftNext2 < 1 {
+						continue
+					}
+
+					valve2.isOpen = true
+					valves[name2] = valve2
+
+					thisPressure := pressure + TraverseDouble(graph, valves, edge1.to, edge2.to, name1, name2, timeLeftNext1, timeLeftNext2)
+
+					valve2.isOpen = false
+					valves[name2] = valve2
+
+					if thisPressure > maxPressure {
+						maxPressure = thisPressure
+					}
+				}
+			}
+
+			valve1.isOpen = false
+			valves[name1] = valve1
+
+		}
+	}
+
 	return maxPressure
 }
 
@@ -234,16 +263,17 @@ func Run(fileName string) Result {
 	// fmt.Println()
 
 	pressure := 0
-	path := []string{}
 	// pressure = Traverse(graph, valves, "AA", "", 25, &path)
-	pressure = Traverse(graph, valves, "AA", "", 30, &path)
+	pressure = Traverse(graph, valves, "AA", "", 30)
 
-	fmt.Println(path)
-	fmt.Println(pressure)
+	// fmt.Println(path)
+	// fmt.Println(pressure)
 	// for _, v := range valves {
 	// 	fmt.Println(v.name, v.isOpen, v.flowRate)
 	// }
 	// fmt.Println()
 
-	return Result{pressure, 0}
+	pressure2 := TraverseDouble(graph, valves, "AA", "AA", "", "", 26, 26)
+
+	return Result{pressure, pressure2}
 }
